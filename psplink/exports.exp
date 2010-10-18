@@ -1,0 +1,45 @@
+# Define the exports for the prx
+PSP_BEGIN_EXPORTS
+
+# These four lines are mandatory (although you can add other functions like module_stop)
+# syslib is a psynonym for the single mandatory export.
+PSP_EXPORT_START(syslib, 0, 0x8000)
+PSP_EXPORT_FUNC(module_start)
+PSP_EXPORT_VAR(module_info)
+PSP_EXPORT_END
+
+PSP_EXPORT_START(psplink_driver, 0, 0x0001)
+PSP_EXPORT_FUNC(psplinkPresent)
+PSP_EXPORT_FUNC(psplinkExitShell)
+PSP_EXPORT_FUNC(psplinkReferModule)
+PSP_EXPORT_FUNC(psplinkGetFullThreadContext)
+PSP_EXPORT_FUNC(psplinkReferModuleByName)
+PSP_EXPORT_FUNC(psplinkReferThreadsByModule)
+PSP_EXPORT_FUNC(psplinkReset)
+PSP_EXPORT_FUNC(apiHookByName)
+PSP_EXPORT_FUNC(apiHookByNid)
+PSP_EXPORT_FUNC(debugRegisterEventHandler)
+PSP_EXPORT_FUNC(debugUnregisterEventHandler)
+PSP_EXPORT_FUNC(debugWaitDebugEvent)
+PSP_EXPORT_FUNC(debugDeleteBP)
+PSP_EXPORT_FUNC(debugDisableBP)
+PSP_EXPORT_FUNC(debugEnableBP)
+PSP_EXPORT_FUNC(debugFindBPByIndex)
+PSP_EXPORT_FUNC(debugSetBP)
+PSP_EXPORT_FUNC(debugBreakThread)
+PSP_EXPORT_END
+
+PSP_EXPORT_START(psplink, 0, 0x4001)
+PSP_EXPORT_FUNC(psplinkPresent)
+PSP_EXPORT_FUNC(psplinkExitShell)
+PSP_EXPORT_FUNC(psplinkReferModule)
+PSP_EXPORT_FUNC(psplinkReferModuleByName)
+PSP_EXPORT_FUNC(psplinkReset)
+PSP_EXPORT_FUNC(apiHookByName)
+PSP_EXPORT_FUNC(apiHookByNid)
+PSP_EXPORT_FUNC(_apiHookHandle)
+PSP_EXPORT_FUNC(_apiHookReturn)
+PSP_EXPORT_FUNC(apiHookRegisterUserDispatch)
+PSP_EXPORT_END
+
+PSP_END_EXPORTS

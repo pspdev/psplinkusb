@@ -1,0 +1,39 @@
+RemoteJoy for PSPLINK v1.0 (c) TyRaNiD 2006
+
+This is an example of the Asynchronous Provider Framework (APF) for PSPLINK, 
+it allows you to use a PC joypad connected to a Linux machine to control the
+PSP as if you were using the real joypad.
+
+It is a demo of what could be done with the APF and is not really designed
+to be worthwhile, however it could be useful for presentational work where
+the PSP is fixed into a stand and you don't want to have to touch the PSP 
+itself. 
+
+So how to use?
+
+First build the PC application, at this point you may want to create a mapfile
+to ensure the buttons are mapped correctly and so you can use analog control
+if your PC joypad supports it. Run the PC remotejoy application with the -b
+switch passing in the name of the mapfile (i.e. -b mymap.txt). You also need to
+supply the device filename of the joystick as the last paramter (this is usually
+/dev/js0 or /dev/input/js0 depending on your version of linux). This starts a
+simple configuration system which will ask you to either move a joystick or 
+press a button. If your pad does not support analogue input and you dont want
+to map a digital pad to it when asked for the analogue input just press a button
+instead. At this point you can edit the file and tweak the tol:num value if you 
+mapped the digital input to an analogue stick. Valid values are between 0 and 
+32767.
+
+Now run the remotejoy application with the name of the device file again but this
+time specify the -m option passing in the name of the mapfile you created. Finally
+run remotejoy.prx on the PSP and then load your game/application or even the VSH
+and test it out.
+
+Note that this is not persistent, you need to load it up before you want to use it
+and it does not support either use of the latch functions (which may affect some
+games possibly I do not know) or any of the special keys (such as home/note etc).
+
+I have provided a mapping file for my MS Sidewinder USB gamepad so if you have that
+you don't even need to make your own (unless you want to of course :P)
+
+Anyway have fun.

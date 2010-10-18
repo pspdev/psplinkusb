@@ -1,0 +1,17 @@
+PSPLINK USB Kprintf driver (c) TyRaNiD 2k6
+
+This is a simple tool to output kprintf via USB (or for that matter wifi) which by default isn't possible.
+Kprintf is designed to be called from virtually anywhere, with interrupts enabled or disabled so in the
+usual case you cannot just pass the characters to printf and expect them to work as they probably wont,
+if you are lucky you get away with it but most of the time it will probably crash the PSP. This app works
+by throwing the characters into a buffer and signalling a thread to print the data set. There is a small
+risk of an infinite loop occuring if the event flag screws up but hopefully that wont happen very often :P
+
+To use ensure kprintf=1 in the psplink.ini file and then run usbkprintf.prx. Kprintf should now go via
+the normal printf channel.
+
+There are a couple of bugs/limitations with this app, if the 4k buffer fills up kprintf data will be lost,
+you can see this if you run memblocks in the shell for example. And there is the aformentioned risk of
+an infinite loop, most certainly do not run with a debug build of usbhostfs unless you like holding the
+power button. Still it should be good enough to capture the errors from module loads etc which are sometimes
+very useful :)

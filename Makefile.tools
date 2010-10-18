@@ -1,0 +1,35 @@
+all:
+	$(MAKE) -C tools/debugmenu all
+	$(MAKE) -C tools/remotejoy all
+	$(MAKE) -C tools/scrkprintf all
+	$(MAKE) -C tools/siokprintf all
+	$(MAKE) -C tools/usbkprintf all
+
+release: all
+	cp tools/debugmenu/debugmenu.prx release/v1.0/psplink
+	cp tools/debugmenu/debugmenu.prx release/v1.5/psplink
+	cp tools/debugmenu/debugmenu.prx release/v1.5_nocorrupt/__SCE__psplink
+	cp tools/debugmenu/debugmenu.prx release_oe/psplink
+	cp tools/remotejoy/remotejoy.prx release/v1.0/psplink
+	cp tools/remotejoy/remotejoy.prx release/v1.5/psplink
+	cp tools/remotejoy/remotejoy.prx release/v1.5_nocorrupt/__SCE__psplink
+	cp tools/remotejoy/remotejoy.prx release_oe/psplink
+	cp tools/scrkprintf/scrkprintf.prx release/v1.0/psplink
+	cp tools/scrkprintf/scrkprintf.prx release/v1.5/psplink
+	cp tools/scrkprintf/scrkprintf.prx release/v1.5_nocorrupt/__SCE__psplink
+	cp tools/scrkprintf/scrkprintf.prx release_oe/psplink
+	cp tools/siokprintf/siokprintf.prx release/v1.0/psplink
+	cp tools/siokprintf/siokprintf.prx release/v1.5/psplink
+	cp tools/siokprintf/siokprintf.prx release/v1.5_nocorrupt/__SCE__psplink
+	cp tools/siokprintf/siokprintf.prx release_oe/psplink
+	cp tools/usbkprintf/usbkprintf.prx release/v1.0/psplink
+	cp tools/usbkprintf/usbkprintf.prx release/v1.5/psplink
+	cp tools/usbkprintf/usbkprintf.prx release/v1.5_nocorrupt/__SCE__psplink
+	cp tools/usbkprintf/usbkprintf.prx release_oe/psplink
+
+clean:
+	$(MAKE) -C tools/debugmenu clean
+	$(MAKE) -C tools/remotejoy clean
+	$(MAKE) -C tools/scrkprintf clean
+	$(MAKE) -C tools/siokprintf clean
+	$(MAKE) -C tools/usbkprintf clean

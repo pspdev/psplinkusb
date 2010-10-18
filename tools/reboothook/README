@@ -1,0 +1,21 @@
+Reboot hook for PSPLINK (c) TyRaNiD 2k6
+
+This is a simple tool to patch out the plain text module check during a reset
+of the kernel. It allows you to run pretty much anything from LoadExec such
+as prx files which usually cause the system to drop back to the vsh. 
+
+USAGE: 
+
+Run make to build the executable and then in PSPLINK run setup.sh. Ensure 
+that the current shell directory is the same as the one containing 
+reboothook.bin. Once you run the script you can loadexec anything from ms0
+(host will not be up anyway at that point so it wont work). 
+
+For example typing into the shell :
+
+./setup.sh
+me @vsh ms0:/psp/game/psplink/psplink.prx
+
+will reboot the main part of psplink in vsh mode. Note if you do this you
+can only reset if you either rerun the setup.sh or do
+me ms0:/psp/game/psplink/eboot.pbp

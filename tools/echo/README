@@ -1,0 +1,7 @@
+This is a simple example of the Asynchronous Provider Framework (APF) for PSPLINK.
+It creates an echo server so you can connect on to your localhost and it will 
+echo back the results to you. To prove it isn't cheating the text will also be
+displayed on the PSP's screen.
+
+To use run echo.prx and it will print the port to connect to, now use something 
+like netcat to connect to localhost on the port specified and start typing.

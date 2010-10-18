@@ -1,0 +1,43 @@
+all:
+	$(MAKE) -C libpsplink all
+	$(MAKE) -C libpsplink_driver all
+	$(MAKE) -C libusbhostfs all
+	$(MAKE) -C libusbhostfs_driver all
+	$(MAKE) -C psplink all PSP_FW_VERSION=271
+	$(MAKE) -C psplink_user all PSP_FW_VERSION=271
+	$(MAKE) -C usbhostfs all PSP_FW_VERSION=271
+	$(MAKE) -C usbgdb    all PSP_FW_VERSION=271
+	$(MAKE) -C boot271   release PSP_FW_VERSION=271
+
+release: clean all
+	mkdir -p release_oe/
+	mkdir -p release_oe/pc
+	mkdir -p release_oe/psplink
+	cp -Rf scripts release_oe/scripts
+	cp psplink/psplink.prx release_oe/psplink
+	cp psplink/psplink.ini release_oe/psplink
+	cp psplink_user/psplink_user.prx release_oe/psplink
+	cp usbhostfs/usbhostfs.prx release_oe/psplink
+	cp usbgdb/usbgdb.prx release_oe/psplink
+	cp boot271/EBOOT.PBP release_oe/psplink
+	cp -Rf pspsh release_oe/pc
+	mkdir release_oe/pc/psplink
+	cp psplink/shellcmd.h release_oe/pc/psplink
+	cp -Rf usbhostfs_pc release_oe/pc
+	cp -Rf windows release_oe/pc
+	cp usbhostfs/usbhostfs.h release_oe/pc/usbhostfs_pc
+	cp README release_oe
+	cp LICENSE release_oe
+	cp psplink_manual.pdf release_oe
+
+clean:
+	$(MAKE) -C libpsplink clean
+	$(MAKE) -C libpsplink_driver clean
+	$(MAKE) -C libusbhostfs clean
+	$(MAKE) -C libusbhostfs_driver clean
+	$(MAKE) -C psplink	clean
+	$(MAKE) -C psplink_user clean
+	$(MAKE) -C usbhostfs clean
+	$(MAKE) -C usbgdb   clean
+	$(MAKE) -C boot271   clean
+	rm -rf release_oe

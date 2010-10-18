@@ -1,0 +1,15 @@
+
+all:
+	$(MAKE) -C pspsh all
+	$(MAKE) -C usbhostfs_pc all
+	if ( which sdl-config ); then { $(MAKE) -C tools/remotejoy/pcsdl all; } else { $(MAKE) -C tools/remotejoy/pc all; } fi
+
+install: all
+	$(MAKE) -C pspsh install
+	$(MAKE) -C usbhostfs_pc install
+	if ( which sdl-config ); then { $(MAKE) -C tools/remotejoy/pcsdl install; } else { $(MAKE) -C tools/remotejoy/pc install; } fi
+
+clean:
+	$(MAKE) -C pspsh clean
+	$(MAKE) -C usbhostfs_pc clean
+	if ( which sdl-config ); then { $(MAKE) -C tools/remotejoy/pcsdl clean; } else { $(MAKE) -C tools/remotejoy/pc clean; } fi

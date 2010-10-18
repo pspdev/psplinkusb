@@ -1,0 +1,11 @@
+tol:10000
+digital:3
+cross:0
+circle:1
+triangle:4
+square:3
+ltrig:5
+rtrig:2
+start:6
+select:9
+analog:0

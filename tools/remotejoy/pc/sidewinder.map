@@ -1,0 +1,17 @@
+# Mapping file for Sidewinder Gamepad USB
+
+# Specify the digital axis
+digital:0
+
+# Specify the analog joystick
+# analog:0
+
+# Specify the button mappings
+square:4
+triangle:5
+cross:1
+circle:2
+ltrig:6
+rtrig:7
+start:9
+select:8
