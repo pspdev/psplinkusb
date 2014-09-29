@@ -974,8 +974,8 @@ int init_readline(void)
 #endif
 	rl_attempted_completion_function = shell_completion;
 	rl_callback_handler_install("", cli_handler);
-	rl_basic_word_break_characters = strdup("\t\n ");
-	rl_completer_word_break_characters = strdup("\t\n ");
+	rl_basic_word_break_characters = "\t\n ";
+	rl_completer_word_break_characters = "\t\n ";
 
 	return 1;
 }
@@ -1982,8 +1982,6 @@ void shutdown_app(void)
 	if(!g_context.args.script)
 	{
 		rl_callback_handler_remove();
-		free(rl_basic_word_break_characters);
-		free(rl_completer_word_break_characters);
 	}
 }
 
