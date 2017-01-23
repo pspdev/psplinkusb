@@ -16,6 +16,7 @@
 #include <pspsdk.h>
 #include <pspctrl.h>
 #include <psppower.h>
+#include <pspsyscon.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,6 +35,8 @@ struct AsyncEndpoint g_endp;
 DebugEventHandler g_handler;
 struct GdbContext g_context;
 SceUID g_thid = -1;
+
+int g_userend; // End address of the user memory
 
 int initialise(SceSize args, void *argp)
 {
@@ -110,6 +113,15 @@ int initialise(SceSize args, void *argp)
 	g_context.ctx.regs.cause = 9 << 2;
 
 	printf("Loaded %s - UID 0x%08X, Entry 0x%08X\n", (char*)argp, g_context.uid, g_context.info.entry_addr);
+        
+        int t_pommel;
+        
+        int t_result = sceSysconGetPommelVersion(&t_pommel);
+        
+        if ((t_pommel >= 0x123) && (t_result == 0)) // If PSP 2000 or newer allow 64MB to be peeked and poked instead of 32MB
+            g_userend = 0x0C000000;
+        else
+            g_userend = 0x0A000000;
 
 	return 1;
 }
@@ -125,7 +137,8 @@ int GdbReadByte(unsigned char *address, unsigned char *dest)
 	nibble = addr >> 28;
 	addr &= 0x0FFFFFFF;
 
-	if((addr >= 0x08800000) && (addr < 0x0A000000))
+
+	if((addr >= 0x08800000) && (addr < g_userend))
 	{
 		if((nibble == 0) || (nibble == 4) || (nibble == 8) || (nibble == 10))
 		{
@@ -160,7 +173,7 @@ int GdbWriteByte(char val, unsigned char *dest)
 	nibble = addr >> 28;
 	addr &= 0x0FFFFFFF;
 
-	if((addr >= 0x08800000) && (addr < 0x0A000000))
+	if((addr >= 0x08800000) && (addr < g_userend))
 	{
 		if((nibble == 0) || (nibble == 4) || (nibble == 8) || (nibble == 10))
 		{
