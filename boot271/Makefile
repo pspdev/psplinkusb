@@ -16,5 +16,10 @@ LDFLAGS =
 PSP_LARGE_MEMORY = 1
 BUILD_PRX = 1
 
+EXTRA_CLEAN = clean_eboot
+
 PSPSDK=$(shell psp-config --pspsdk-path)
 include $(PSPSDK)/lib/build_prx.mak
+
+clean_eboot:
+	rm -f EBOOT.PBP
