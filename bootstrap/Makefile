@@ -9,7 +9,7 @@ CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS = $(CFLAGS)
 
 LIBDIR =
-LDFLAGS = -mno-crt0 -nostartfiles -Tbootlink
+LDFLAGS = -nostartfiles -Tbootlink
 
 LIBS = 
 
