@@ -283,7 +283,7 @@ void set_frame_buf(void *topaddr, int bufferwidth, int pixelformat, int sync)
 	sceDisplaySetFrameBufferInternal(2, topaddr, bufferwidth, pixelformat, sync);
 }
 
-inline int build_frame(void)
+inline static int build_frame(void)
 {
 	struct JoyScrHeader *head;
 	void *topaddr;

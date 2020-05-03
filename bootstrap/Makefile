@@ -3,19 +3,21 @@ OBJS = main.o exports.o
 
 USE_PSPSDK_LIBC = 1
 
-INCDIR = 
+INCDIR =
 CFLAGS = -O2 -G0 -Wall
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS = $(CFLAGS)
 
 LIBDIR =
-LDFLAGS = -mno-crt0 -nostartfiles -Tbootlink
+LDFLAGS = -nostartfiles -Tbootlink
 
-LIBS = 
+LIBS =
 
 EXTRA_TARGETS = EBOOT.PBP
 PSP_EBOOT_TITLE = PSPLink 3.0
 PSP_EBOOT_ICON = psplink.png
+
+EXTRA_CLEAN += ./$(TARGET)/EBOOT.PBP ./$(TARGET)%/EBOOT.PBP
 
 PSPSDK=$(shell psp-config --pspsdk-path)
 include $(PSPSDK)/lib/build.mak
