@@ -1,1 +1,1 @@
-SUBSYSTEM=="usb_device", SYSFS{idVendor}=="054c", SYSFS{idProduct}=="01c9"  MODE="0666"
+SUBSYSTEM=="usb", SYSFS{idVendor}=="054c", SYSFS{idProduct}=="01c9", MODE="0666"
