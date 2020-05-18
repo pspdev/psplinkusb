@@ -6,11 +6,11 @@ all:
 	$(MAKE) -C tools/usbkprintf all
 
 release: all
-	cp tools/debugmenu/debugmenu.prx release_oe/psplink
-	cp tools/remotejoy/remotejoy.prx release_oe/psplink
-	cp tools/scrkprintf/scrkprintf.prx release_oe/psplink
-	cp tools/siokprintf/siokprintf.prx release_oe/psplink
-	cp tools/usbkprintf/usbkprintf.prx release_oe/psplink
+	cp tools/debugmenu/debugmenu.prx release/psplink
+	cp tools/remotejoy/remotejoy.prx release/psplink
+	cp tools/scrkprintf/scrkprintf.prx release/psplink
+	cp tools/siokprintf/siokprintf.prx release/psplink
+	cp tools/usbkprintf/usbkprintf.prx release/psplink
 
 clean:
 	$(MAKE) -C tools/debugmenu clean
