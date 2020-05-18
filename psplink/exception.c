@@ -246,6 +246,7 @@ void exceptionPrint(struct PsplinkContext *ctx)
 		}
 
 		SHELL_PRINT("Status    - 0x%08X\n", ctx->regs.status);
+		SHELL_PRINT("Address   - 0x%08X\n", ctx->regs.epc-mod.text_addr);
 		exceptionPrintCPURegs(ctx->regs.r);
 	}
 	else
