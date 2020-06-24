@@ -3822,10 +3822,9 @@ static int irqs_cmd(int argc, char **argv, unsigned int *vRet)
 	{
 		for(i = 0; i < 67; i++)
 		{
-			int ret;
 			memset(&data, 0, sizeof(data));
 			data.size = sizeof(data);
-			ret = QueryIntrHandlerInfo(i, -1, &data);
+			QueryIntrHandlerInfo(i, -1, &data);
 			print_irq(&data, i, -1);
 		}
 	}

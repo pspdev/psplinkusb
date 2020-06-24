@@ -867,12 +867,10 @@ int psplinkReferModule(SceUID uid, SceKernelModuleInfo *info)
 static int is_nan(float *val)
 {
 	unsigned int conv;
-	int sign;
 	int exp;
 	int mantissa;
 
 	conv = *((unsigned int *) val);
-	sign = (conv >> 31) & 1;
 
 	exp = (conv >> 23) & 0xff;
 	mantissa = conv & 0x7fffff;
@@ -916,7 +914,6 @@ static int is_inf(float *val)
 static char get_num(float *val, int *exp)
 {
 	int digit;
-	float tmp;
 	char ret = '0';
 
 	if((*exp)++ < 16)
@@ -925,7 +922,6 @@ static char get_num(float *val, int *exp)
 		if((digit >= 0) && (digit < 10))
 		{
 			ret = digit + '0';
-			tmp = (float) digit;
 			*val = (*val - digit)*10.0f;
 		}
 	}
@@ -974,7 +970,7 @@ void f_cvt(float *val, char *buf, int bufsize, int precision, int mode)
 	if(*val < 0.0f)
 	{
 		sign = 1;
-		normval -= *val;
+		normval = *val;
 	}
 	else
 	{
