@@ -539,7 +539,7 @@ int closefile(PspFile *pFile)
 }
 
 /* Seems the kernel's fdgetc is broken :/ */
-int fdgetc(PspFile *pFile)
+int fixed_fdgetc(PspFile *pFile)
 {
 	int ch = -1;
 
@@ -568,7 +568,7 @@ int fdgetc(PspFile *pFile)
 }
 
 /* As the kernel's fdgetc is broke so is fdgets */
-int fdgets(PspFile *pFile, char *buf, int max)
+int fixed_fdgets(PspFile *pFile, char *buf, int max)
 {
 	int pos = 0;
 
@@ -576,7 +576,7 @@ int fdgets(PspFile *pFile, char *buf, int max)
 	{
 		int ch;
 
-		ch = fdgetc(pFile);
+		ch = fixed_fdgetc(pFile);
 
 		/* EOF */
 		if(ch == -1)

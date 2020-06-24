@@ -66,7 +66,7 @@ const char* psplinkConfigReadNext(struct ConfigFile *cnf, const char **name)
 			break;
 		}
 
-		while((pVal == NULL) && (fdgets(&cnf->file, cnf->str_buf, MAX_BUFFER)))
+		while((pVal == NULL) && (fixed_fdgets(&cnf->file, cnf->str_buf, MAX_BUFFER)))
 		{
 			char *eq_pos;
 
