@@ -8,8 +8,6 @@
  * Copyright (c) 2005 Julian T <lovely@crm114.net>
  * Copyright (c) 2005 James F <tyranid@gmail.com>
  *
- * $HeadURL: svn://svn.ps2dev.org/psp/trunk/psplinkusb/psplink/util.h $
- * $Id: util.h 2316 2007-09-17 18:13:33Z tyranid $
  */
 
 #ifndef __UTIL_H__

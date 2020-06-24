@@ -7,8 +7,6 @@
  *
  * Copyright (c) 2005 James F <tyranid@gmail.com>
  *
- * $HeadURL: svn://svn.ps2dev.org/psp/trunk/psplinkusb/psplink/psplinkcnf.c $
- * $Id: psplinkcnf.c 1766 2006-01-29 00:03:02Z tyranid $
  */
 #include <pspkernel.h>
 #include <pspdebug.h>

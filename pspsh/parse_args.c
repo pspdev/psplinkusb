@@ -7,8 +7,6 @@
  *
  * Copyright (c) 2005 James F <tyranid@gmail.com>
  *
- * $HeadURL: svn://svn.ps2dev.org/psp/trunk/psplinkusb/pspsh/parse_args.C $
- * $Id: parse_args.C 2222 2007-04-23 19:12:30Z tyranid $
  */
 
 #include <stdio.h>

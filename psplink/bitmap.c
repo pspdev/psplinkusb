@@ -7,8 +7,6 @@
  *
  * Copyright (c) 2005 James F <tyranid@gmail.com>
  *
- * $HeadURL: svn://svn.ps2dev.org/psp/trunk/psplinkusb/psplink/bitmap.c $
- * $Id: bitmap.c 2026 2006-10-14 13:09:48Z tyranid $
  */
 
 #include <pspkernel.h>

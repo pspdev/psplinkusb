@@ -7,8 +7,6 @@
  *
  * Copyright (c) 2006 James F <tyranid@gmail.com>
  *
- * $HeadURL: svn://svn.pspdev.org/psp/branches/psplinkusb/pcterm/pcterm.c $
- * $Id: pcterm.c 1963 2006-07-07 17:25:29Z tyranid $
  */
 #include <stdio.h>
 #include <unistd.h>

@@ -7,8 +7,6 @@
  *
  * Copyright (c) 2005 James F <tyranid@gmail.com>
  *
- * $HeadURL: svn://svn.pspdev.org/psp/branches/psplinkusb/psplink_user/exception_asm.S $
- * $Id: exception_asm.S 1913 2006-05-21 17:26:57Z tyranid $
  */
 
 	.set noreorder

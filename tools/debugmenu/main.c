@@ -7,8 +7,6 @@
  *
  * Copyright (c) 2006 James F <tyranid@gmail.com>
  *
- * $HeadURL: svn://svn.ps2dev.org/psp/trunk/psplinkusb/tools/debugmenu/main.c $
- * $Id: main.c 2018 2006-10-07 16:54:19Z tyranid $
  */
 #include <pspkernel.h>
 #include <pspdebug.h>

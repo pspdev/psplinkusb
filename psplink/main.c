@@ -8,8 +8,6 @@
  * Copyright (c) 2005 James F <tyranid@gmail.com>
  * Copyright (c) 2005 Julian T <lovely@crm114.net>
  *
- * $HeadURL: svn://svn.ps2dev.org/psp/trunk/psplinkusb/psplink/main.c $
- * $Id: main.c 2322 2007-09-30 17:49:32Z tyranid $
  */
 #include <pspkernel.h>
 #include <pspdebug.h>

@@ -7,8 +7,6 @@
  *
  * Copyright (c) 2005 James F <tyranid@gmail.com>
  *
- * $HeadURL: svn://svn.ps2dev.org/psp/trunk/psplinkusb/bootstrap/main.c $
- * $Id: main.c 2200 2007-03-08 21:21:20Z tyranid $
  */
 #include <pspkernel.h>
 #include <pspdebug.h>

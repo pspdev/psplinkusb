@@ -7,8 +7,6 @@
  *
  * Copyright (c) 2006 James F <tyranid@gmail.com>
  *
- * $HeadURL: svn://svn.pspdev.org/psp/branches/psplinkusb/tools/remotejoy/pcsdl/remotejoy.c $
- * $Id: remotejoy.c 2187 2007-02-20 19:28:00Z tyranid $
  */
 #include <stdio.h>
 #include <unistd.h>
@@ -1340,7 +1338,7 @@ void mainloop(void)
 int main(int argc, char **argv)
 {
 	fprintf(stderr, "Remote Joy SDL for PSP (c) TyRaNiD 2k6\n");
-	fprintf(stderr, "Built %s %s - $Revision: 2398 $\n", __DATE__, __TIME__);
+	fprintf(stderr, "Built %s %s\n", __DATE__, __TIME__);
 	memset(&g_context, 0, sizeof(g_context));
 	if(parse_args(argc, argv, &g_context.args))
 	{

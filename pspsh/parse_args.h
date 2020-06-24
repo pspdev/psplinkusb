@@ -7,8 +7,6 @@
  *
  * Copyright (c) 2005 James F <tyranid@gmail.com>
  *
- * $HeadURL: svn://svn.pspdev.org/psp/branches/psplinkusb/psplink/parse_args.h $
- * $Id: parse_args.h 1604 2005-12-18 13:55:03Z tyranid $
  */
 
 #define REDIR_TYPE_NONE 0

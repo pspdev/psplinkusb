@@ -7,8 +7,6 @@
  *
  * Copyright (c) 2006 James F <tyranid@gmail.com>
  *
- * $HeadURL: svn://svn.ps2dev.org/psp/trunk/psplinkusb/tools/remotejoy/remotejoy.h $
- * $Id: remotejoy.h 2186 2007-02-20 04:09:44Z tyranid $
  */
 #ifndef __REMOTE_JOY__
 #define __REMOTE_JOY__

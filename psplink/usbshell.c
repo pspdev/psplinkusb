@@ -7,8 +7,6 @@
  *
  * Copyright (c) 2006 James F <tyranid@gmail.com>
  *
- * $HeadURL: svn://svn.pspdev.org/psp/branches/psplinkusb/usbshell/main.c $
- * $Id: main.c 2034 2006-10-18 17:02:37Z tyranid $
  */
 #include <pspkernel.h>
 #include <pspdebug.h>
