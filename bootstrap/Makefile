@@ -1,7 +1,9 @@
-TARGET = psplink
-OBJS = main.o exports.o
+release: all
+	mksfoex -d MEMSIZE=1 'PSPLink v3.0.1' PARAM.SFO
+	pack-pbp EBOOT.PBP PARAM.SFO psplink.png NULL NULL NULL NULL psplink_boot.prx NULL
 
-USE_PSPSDK_LIBC = 1
+TARGET = psplink_boot
+OBJS = main.o
 
 INCDIR =
 CFLAGS = -O2 -G0 -Wall
@@ -9,15 +11,15 @@ CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS = $(CFLAGS)
 
 LIBDIR =
-LDFLAGS = -nostartfiles -Tbootlink
+LDFLAGS =
 
-LIBS =
+PSP_LARGE_MEMORY = 1
+BUILD_PRX = 1
 
-EXTRA_TARGETS = EBOOT.PBP
-PSP_EBOOT_TITLE = PSPLink 3.0.1
-PSP_EBOOT_ICON = psplink.png
-
-EXTRA_CLEAN += ./$(TARGET)/EBOOT.PBP ./$(TARGET)%/EBOOT.PBP
+EXTRA_CLEAN = clean_eboot
 
 PSPSDK=$(shell psp-config --pspsdk-path)
-include $(PSPSDK)/lib/build.mak
+include $(PSPSDK)/lib/build_prx.mak
+
+clean_eboot:
+	rm -f EBOOT.PBP
