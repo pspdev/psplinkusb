@@ -1,3 +1,6 @@
+
+.PHONY: all release clean
+
 all:
 	$(MAKE) -C tools/debugmenu all
 	$(MAKE) -C tools/remotejoy all

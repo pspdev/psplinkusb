@@ -1,3 +1,6 @@
+
+.PHONY: all release clean
+
 all:
 	$(MAKE) -f Makefile.psp all
 	$(MAKE) -f Makefile.tools all

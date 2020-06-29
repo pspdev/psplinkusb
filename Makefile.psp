@@ -1,3 +1,6 @@
+
+.PHONY: all release clean
+
 all:
 	$(MAKE) -C libpsplink all
 	$(MAKE) -C libpsplink_driver all
@@ -26,7 +29,7 @@ release: clean all
 	cp -Rf usbhostfs_pc release/pc
 	cp -Rf windows release/pc
 	cp usbhostfs/usbhostfs.h release/pc/usbhostfs_pc
-	cp README release
+	cp README.md release
 	cp LICENSE release
 	cp psplink_manual.pdf release
 
