@@ -37,7 +37,7 @@ void modLoad(const char *bootpath)
 
 	if(openfile(ini_path, &fmod))
 	{
-		while(fdgets(&fmod, buf, sizeof(buf)))
+		while(fixed_fdgets(&fmod, buf, sizeof(buf)))
 		{
 			strip_whitesp(buf);
 			if(buf[0])

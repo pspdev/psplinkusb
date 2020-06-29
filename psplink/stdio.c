@@ -8,8 +8,6 @@
  * Copyright (c) 2005 James F <tyranid@gmail.com>
  * Copyright (c) 2005 Julian T <lovely@crm114.net>
  *
- * $HeadURL: svn://svn.ps2dev.org/psp/trunk/psplinkusb/psplink/stdio.c $
- * $Id: stdio.c 2304 2007-08-26 17:21:11Z tyranid $
  */
 
 /* Based off the pspsdk tty code */

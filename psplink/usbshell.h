@@ -7,8 +7,6 @@
  *
  * Copyright (c) 2006 James F <tyranid@gmail.com>
  *
- * $HeadURL$
- * $Id$
  */
 
 int usbShellInit(void);

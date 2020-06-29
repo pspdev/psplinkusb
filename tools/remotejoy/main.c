@@ -7,8 +7,6 @@
  *
  * Copyright (c) 2006 James F <tyranid@gmail.com>
  *
- * $HeadURL: svn://svn.ps2dev.org/psp/trunk/psplinkusb/tools/remotejoy/main.c $
- * $Id: main.c 2204 2007-03-11 19:16:01Z tyranid $
  */
 #include <pspkernel.h>
 #include <pspdebug.h>

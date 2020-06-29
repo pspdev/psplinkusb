@@ -7,8 +7,6 @@
  *
  * Copyright (c) 2007 James F <tyranid@gmail.com>
  *
- * $HeadURL$
- * $Id$
  */
 #include <pspkernel.h>
 #include <pspdebug.h>

@@ -7,8 +7,6 @@
  *
  * Copyright (c) 2006 James Forshaw <tyranid@gmail.com>
  *
- * $HeadURL: svn://svn.ps2dev.org/psp/trunk/psplinkusb/usbhostfs/host_driver.c $
- * $Id: host_driver.c 1954 2006-06-28 17:54:29Z tyranid $
  */
 #include <pspkernel.h>
 #include <pspdebug.h>

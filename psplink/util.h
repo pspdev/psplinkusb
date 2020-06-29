@@ -8,8 +8,6 @@
  * Copyright (c) 2005 Julian T <lovely@crm114.net>
  * Copyright (c) 2005 James F <tyranid@gmail.com>
  *
- * $HeadURL: svn://svn.ps2dev.org/psp/trunk/psplinkusb/psplink/util.h $
- * $Id: util.h 2316 2007-09-17 18:13:33Z tyranid $
  */
 
 #ifndef __UTIL_H__
@@ -49,8 +47,8 @@ int stop_usbhost(void);
 void save_execargs(int argc, char **argv);
 int openfile(const char *filename, PspFile *pFile);
 int closefile(PspFile *pFile);
-int fdgetc(PspFile *pFile);
-int fdgets(PspFile *pFile, char *buf, int size);
+int fixed_fdgetc(PspFile *pFile);
+int fixed_fdgets(PspFile *pFile, char *buf, int size);
 void strip_whitesp(char *s);
 int strtoint(const char *str, unsigned int *i);
 void* memmem_mask(void *data, void *mask, int len, void *search, int slen);

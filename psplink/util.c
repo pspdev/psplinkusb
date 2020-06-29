@@ -8,8 +8,6 @@
  * Copyright (c) 2005 James F <tyranid@gmail.com>
  * Copyright (c) 2005 Julian T <lovely@crm114.net>
  *
- * $HeadURL: svn://svn.ps2dev.org/psp/trunk/psplinkusb/psplink/util.c $
- * $Id: util.c 2322 2007-09-30 17:49:32Z tyranid $
  */
 #include <pspkernel.h>
 #include <pspdebug.h>
@@ -541,7 +539,7 @@ int closefile(PspFile *pFile)
 }
 
 /* Seems the kernel's fdgetc is broken :/ */
-int fdgetc(PspFile *pFile)
+int fixed_fdgetc(PspFile *pFile)
 {
 	int ch = -1;
 
@@ -570,7 +568,7 @@ int fdgetc(PspFile *pFile)
 }
 
 /* As the kernel's fdgetc is broke so is fdgets */
-int fdgets(PspFile *pFile, char *buf, int max)
+int fixed_fdgets(PspFile *pFile, char *buf, int max)
 {
 	int pos = 0;
 
@@ -578,7 +576,7 @@ int fdgets(PspFile *pFile, char *buf, int max)
 	{
 		int ch;
 
-		ch = fdgetc(pFile);
+		ch = fixed_fdgetc(pFile);
 
 		/* EOF */
 		if(ch == -1)
@@ -869,12 +867,10 @@ int psplinkReferModule(SceUID uid, SceKernelModuleInfo *info)
 static int is_nan(float *val)
 {
 	unsigned int conv;
-	int sign;
 	int exp;
 	int mantissa;
 
 	conv = *((unsigned int *) val);
-	sign = (conv >> 31) & 1;
 
 	exp = (conv >> 23) & 0xff;
 	mantissa = conv & 0x7fffff;
@@ -918,7 +914,6 @@ static int is_inf(float *val)
 static char get_num(float *val, int *exp)
 {
 	int digit;
-	float tmp;
 	char ret = '0';
 
 	if((*exp)++ < 16)
@@ -927,7 +922,6 @@ static char get_num(float *val, int *exp)
 		if((digit >= 0) && (digit < 10))
 		{
 			ret = digit + '0';
-			tmp = (float) digit;
 			*val = (*val - digit)*10.0f;
 		}
 	}
@@ -976,7 +970,7 @@ void f_cvt(float *val, char *buf, int bufsize, int precision, int mode)
 	if(*val < 0.0f)
 	{
 		sign = 1;
-		normval -= *val;
+		normval = *val;
 	}
 	else
 	{

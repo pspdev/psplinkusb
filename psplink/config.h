@@ -8,8 +8,6 @@
  * Copyright (c) 2005 James F <tyranid@gmail.com>
  * Copyright (c) 2005 Julian T <lovely@crm114.net>
  *
- * $HeadURL: svn://svn.ps2dev.org/psp/trunk/psplinkusb/psplink/config.h $
- * $Id: config.h 2148 2007-01-23 18:04:34Z tyranid $
  */
 
 #ifndef __CONFIG_H__

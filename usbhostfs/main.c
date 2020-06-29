@@ -7,8 +7,6 @@
  *
  * Copyright (c) 2006 James F <tyranid@gmail.com>
  *
- * $HeadURL: svn://svn.ps2dev.org/psp/trunk/psplinkusb/usbhostfs/main.c $
- * $Id: main.c 2189 2007-02-24 12:16:44Z tyranid $
  */
 #include <pspkernel.h>
 #include <pspdebug.h>
@@ -1139,6 +1137,7 @@ int start_func(int size, void *p)
 
 	ret = hostfs_init();
 	DEBUG_PRINTF("hostfs_init: %d\n", ret);
+	(void)ret;
 
 	if(sceKernelStartThread(g_thid, 0, NULL))
 	{
@@ -1212,6 +1211,7 @@ int module_start(SceSize args, void *argp)
 	ret = sceUsbbdRegister(&g_driver);
 	memset(g_async_chan, 0, sizeof(g_async_chan));
 	DEBUG_PRINTF("sceUsbbdRegister %08X\n", ret);
+	(void)ret;
 	DEBUG_PRINTF("g_driver 0x%p\n", &g_driver);
 	MODPRINTF("USB HostFS Driver (c) TyRaNiD 2k6\n");
 
@@ -1225,6 +1225,7 @@ int module_stop(SceSize args, void *argp)
 
 	ret = sceUsbbdUnregister(&g_driver);
 	DEBUG_PRINTF("sceUsbbdUnregister %08X\n", ret);
+	(void)ret;
 	hostfs_term();
 
 	return 0;

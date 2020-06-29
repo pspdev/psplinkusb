@@ -7,8 +7,6 @@
  *
  * Copyright (c) 2007 James F <tyranid@gmail.com>
  *
- * $HeadURL: svn://svn.ps2dev.org/psp/trunk/psplinkusb/usbgdb/common.h $
- * $Id: common.h 2174 2007-02-08 19:49:27Z tyranid $
  */
 #ifndef __COMMON_H__
 #define __COMMON_H__

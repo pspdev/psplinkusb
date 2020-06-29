@@ -7,8 +7,6 @@
  *
  * Copyright (c) 2006 James F <tyranid@gmail.com>
  *
- * $HeadURL: svn://svn.pspdev.org/psp/branches/psplinkusb/pspsh/asm.h $
- * $Id: asm.h 2157 2007-01-29 22:50:26Z tyranid $
  */
 #ifndef __ASM_H__
 #define __ASM_H__

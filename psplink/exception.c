@@ -7,8 +7,6 @@
  *
  * Copyright (c) 2005 James F <tyranid@gmail.com>
  *
- * $HeadURL: svn://svn.ps2dev.org/psp/trunk/psplinkusb/psplink/exception.c $
- * $Id: exception.c 2316 2007-09-17 18:13:33Z tyranid $
  */
 #include <pspkernel.h>
 #include <pspdebug.h>

@@ -7,8 +7,6 @@
  *
  * Copyright (c) 2005 James F <tyranid@gmail.com>
  *
- * $HeadURL: svn://svn.pspdev.org/psp/branches/psplinkusb/psplink/psplink.h $
- * $Id: psplink.h 2021 2006-10-12 22:22:21Z tyranid $
  */
 
 #ifndef __SHELLCMD_H

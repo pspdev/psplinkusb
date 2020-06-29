@@ -7,8 +7,6 @@
  *
  * Copyright (c) 2006 James F <tyranid@gmail.com>
  *
- * $HeadURL: svn://svn.ps2dev.org/psp/trunk/psplinkusb/sersh/sersh.c $
- * $Id: sersh.c 2163 2007-02-01 21:25:53Z tyranid $
  */
 #include <stdio.h>
 #include <unistd.h>

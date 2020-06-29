@@ -1,6 +1,6 @@
 /* Font nabbed for PSPLINK */
 /*
- * PSP Software Development Kit - http://www.pspdev.org
+ * PSP Software Development Kit - https://github.com/pspdev
  * -----------------------------------------------------------------------
  * Licensed under the BSD license, see LICENSE in PSPSDK root for details.
  *
@@ -10,7 +10,6 @@
  * Copyright (c) 2005 James Forshaw <tyranid@gmail.com>
  * Copyright (c) 2005 John Kelley <ps2dev@kelley.ca>
  *
- * $Id: font.c 2187 2007-02-20 19:28:00Z tyranid $
  */
 #include <stdint.h>
 #include <stdarg.h>

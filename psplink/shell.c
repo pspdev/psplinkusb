@@ -8,8 +8,6 @@
  * Copyright (c) 2005 James F <tyranid@gmail.com>
  * Copyright (c) 2005 Julian T <lovely@crm114.net>
  *
- * $HeadURL: svn://svn.ps2dev.org/psp/trunk/psplinkusb/psplink/shell.c $
- * $Id: shell.c 2334 2007-11-03 16:47:05Z tyranid $
  */
 #include <pspkernel.h>
 #include <pspdebug.h>
@@ -3824,10 +3822,9 @@ static int irqs_cmd(int argc, char **argv, unsigned int *vRet)
 	{
 		for(i = 0; i < 67; i++)
 		{
-			int ret;
 			memset(&data, 0, sizeof(data));
 			data.size = sizeof(data);
-			ret = QueryIntrHandlerInfo(i, -1, &data);
+			QueryIntrHandlerInfo(i, -1, &data);
 			print_irq(&data, i, -1);
 		}
 	}

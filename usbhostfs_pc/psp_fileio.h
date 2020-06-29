@@ -7,8 +7,6 @@
  *
  * Copyright (c) 2006 James F <tyranid@gmail.com>
  *
- * $HeadURL: svn://svn.ps2dev.org/psp/trunk/psplinkusb/usbhostfs_pc/psp_fileio.h $
- * $Id: psp_fileio.h 1816 2006-02-26 14:09:15Z tyranid $
  */
 #ifndef __PSP_FILEIO_H__
 #define __PSP_FILEIO_H__

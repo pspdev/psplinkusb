@@ -7,8 +7,6 @@
  *
  * Copyright (c) 2005 James F <tyranid@gmail.com>
  *
- * $HeadURL: svn://svn.ps2dev.org/psp/trunk/psplinkusb/psplink/psplinkcnf.c $
- * $Id: psplinkcnf.c 1766 2006-01-29 00:03:02Z tyranid $
  */
 #include <pspkernel.h>
 #include <pspdebug.h>
@@ -68,7 +66,7 @@ const char* psplinkConfigReadNext(struct ConfigFile *cnf, const char **name)
 			break;
 		}
 
-		while((pVal == NULL) && (fdgets(&cnf->file, cnf->str_buf, MAX_BUFFER)))
+		while((pVal == NULL) && (fixed_fdgets(&cnf->file, cnf->str_buf, MAX_BUFFER)))
 		{
 			char *eq_pos;
 

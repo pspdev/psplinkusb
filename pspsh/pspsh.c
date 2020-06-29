@@ -7,8 +7,6 @@
  *
  * Copyright (c) 2006 James F <tyranid@gmail.com>
  *
- * $HeadURL: svn://svn.ps2dev.org/psp/trunk/psplinkusb/pspsh/pspsh.C $
- * $Id: pspsh.C 2200 2007-03-08 21:21:20Z tyranid $
  */
 #include <stdio.h>
 #include <unistd.h>
@@ -1143,7 +1141,7 @@ int parse_args(int argc, char **argv, struct Args *args)
 void print_help(void)
 {
 	fprintf(stderr, "PSPSH Help (c) TyRaNiD\n");
-	fprintf(stderr, "Built %s %s - $Revision: 2200 $\n", __DATE__, __TIME__);
+	fprintf(stderr, "Built %s %s\n", __DATE__, __TIME__);
 	fprintf(stderr, "Usage: pspsh [options] [script args...]\n");
 	fprintf(stderr, "Options:\n");
 	fprintf(stderr, "-i ipaddr   : Specify the IP address to connect to\n");

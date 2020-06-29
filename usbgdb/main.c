@@ -7,8 +7,6 @@
  *
  * Copyright (c) 2006 James F <tyranid@gmail.com>
  *
- * $HeadURL: svn://svn.ps2dev.org/psp/trunk/psplinkusb/usbgdb/main.c $
- * $Id: main.c 2179 2007-02-15 17:38:02Z tyranid $
  */
 #include <pspkernel.h>
 #include <pspdebug.h>
