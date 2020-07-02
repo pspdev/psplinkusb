@@ -8,8 +8,11 @@ PREFIX=$(shell psp-config --pspdev-path 2> /dev/null)
 
 all: $(OUTPUT)
 
+%.o: %.c
+	$(CXX) -c -o $@ $< $(CXXFLAGS)
+
 $(OUTPUT): $(OBJS)
-	$(CXX) -o $@ $^ $(LIBS)
+	$(CXX) -o $@ $^ $(LIBS) $(CXXFLAGS)
 
 install: $(OUTPUT)
 	@echo "Installing $(OUTPUT)..."
