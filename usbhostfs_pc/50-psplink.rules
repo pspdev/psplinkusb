@@ -1,1 +1,1 @@
-SUBSYSTEM=="usb_device", SYSFS{idVendor}=="054c", SYSFS{idProduct}=="01c9"  MODE="0666"
+SUBSYSTEM=="usb", ATTR{idVendor}=="054c", ATTR{idProduct}=="01c9", SYMLINK+="psp", MODE="0666"
