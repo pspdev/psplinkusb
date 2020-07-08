@@ -35,3 +35,9 @@
 *.prx
 *.PBP
 *.SFO
+
+# Built tools
+pspsh/pspsh
+tools/remotejoy/pcsdl/remotejoy
+tools/remotejoy/pc/remotejoy
+usbhostfs_pc/usbhostfs_pc
