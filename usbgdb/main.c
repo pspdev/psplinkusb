@@ -114,7 +114,7 @@ int initialise(SceSize args, void *argp)
         
         int t_pommel;
         
-        int t_result = sceSysconGetPommelVersion(&t_pommel);
+        int t_result = sceSyscon_driver_E7E87741(&t_pommel);
         
         if ((t_pommel >= 0x123) && (t_result == 0)) // If PSP 2000 or newer allow 64MB to be peeked and poked instead of 32MB
             g_userend = 0x0C000000;
