@@ -784,18 +784,18 @@ static int io_chstat(PspIoDrvFileArg *arg, const char *file, SceIoStat *stat, in
 	cmd.bits = bits;
 	cmd.mode = stat->st_mode;
 	cmd.size = stat->st_size;
-	cmd.atime.year = stat->st_atime.year;
-	cmd.atime.month = stat->st_atime.month;
-	cmd.atime.day = stat->st_atime.day;
-	cmd.atime.hour = stat->st_atime.hour;
-	cmd.atime.minute = stat->st_mtime.minute;
-	cmd.atime.second = stat->st_mtime.second;
-	cmd.mtime.year = stat->st_mtime.year;
-	cmd.mtime.month = stat->st_mtime.month;
-	cmd.mtime.day = stat->st_mtime.day;
-	cmd.mtime.hour = stat->st_mtime.hour;
-	cmd.mtime.minute = stat->st_mtime.minute;
-	cmd.mtime.second = stat->st_mtime.second;
+	cmd.atime.year = stat->sce_st_atime.year;
+	cmd.atime.month = stat->sce_st_atime.month;
+	cmd.atime.day = stat->sce_st_atime.day;
+	cmd.atime.hour = stat->sce_st_atime.hour;
+	cmd.atime.minute = stat->sce_st_mtime.minute;
+	cmd.atime.second = stat->sce_st_mtime.second;
+	cmd.mtime.year = stat->sce_st_mtime.year;
+	cmd.mtime.month = stat->sce_st_mtime.month;
+	cmd.mtime.day = stat->sce_st_mtime.day;
+	cmd.mtime.hour = stat->sce_st_mtime.hour;
+	cmd.mtime.minute = stat->sce_st_mtime.minute;
+	cmd.mtime.second = stat->sce_st_mtime.second;
 	cmd.fsnum = arg->fs_num;
 
 	if(usb_connected())

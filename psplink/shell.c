@@ -1746,9 +1746,9 @@ static int list_dir(const char *name)
 
 			sprintf(p, " %8d ", (int) dir.d_stat.st_size);
 			p += strlen(p);
-			sprintf(p, "%02d-%02d-%04d %02d:%02d ", dir.d_stat.st_mtime.day, 
-					dir.d_stat.st_mtime.month, dir.d_stat.st_mtime.year,
-					dir.d_stat.st_mtime.hour, dir.d_stat.st_mtime.minute);
+			sprintf(p, "%02d-%02d-%04d %02d:%02d ", dir.d_stat.sce_st_ctime.day, 
+					dir.d_stat.sce_st_ctime.month, dir.d_stat.sce_st_ctime.year,
+					dir.d_stat.sce_st_ctime.hour, dir.d_stat.sce_st_ctime.minute);
 			p += strlen(p);
 			sprintf(p, "%s", dir.d_name);
 			SHELL_PRINT("%s\n", buffer);
