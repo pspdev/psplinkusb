@@ -1,8 +1,6 @@
 TARGET = debugmenu
 OBJS = main.o exports.o
 
-# Use the kernel's small inbuilt libc
-USE_KERNEL_LIBC = 1
 # Use only kernel libraries
 USE_KERNEL_LIBS = 1
 

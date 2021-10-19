@@ -1,7 +1,13 @@
 OUTPUT=pspsh
 OBJS=pspsh.o parse_args.o pspkerror.o asm.o disasm.o
 
-CXXFLAGS=-Wall -g -D_PCTERM -I../psplink
+ifeq ($(DEBUG), 1)
+   CXXFLAGS += -O0 -g
+else
+   CXXFLAGS	+= -O3
+endif
+
+CXXFLAGS+= -Wall -D_PCTERM -I../psplink
 LIBS=-lreadline -lcurses
 
 PREFIX=$(shell psp-config --pspdev-path 2> /dev/null)
