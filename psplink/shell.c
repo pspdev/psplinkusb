@@ -13,7 +13,6 @@
 #include <pspdebug.h>
 #include <pspsdk.h>
 #include <stdio.h>
-// #include <stdlib.h>
 #include <string.h>
 #include <pspusb.h>
 #include <pspusbstor.h>
