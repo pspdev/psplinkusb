@@ -42,15 +42,16 @@ jobs:
       run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
 
     - name: Compress & Rename bin folder
-      run: |
-        mv release/ psplinkusb/
-        tar -zcvf psplinkusb-${{ steps.slug.outputs.sha8 }}.tar.gz psplinkusb
+      run: | 
+        tar -zcvf psplinkusb.tar.gz release/psplink
   
     - name: Create pre-release
       if: github.ref == 'refs/heads/master'
       uses: softprops/action-gh-release@v1
       with:
-        files: psplinkusb-${{ steps.slug.outputs.sha8 }}.tar.gz
+        files: |
+          psplinkusb.tar.gz
+          release/psplink_manual.pdf
         prerelease: true
         name: "Development build"
         tag_name: "latest"
@@ -61,7 +62,9 @@ jobs:
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
       with:
-        files: psplinkusb-${{ steps.slug.outputs.sha8 }}.tar.gz
+        files: |
+          psplinkusb.tar.gz
+          release/psplink_manual.pdf
         tag_name: ${{ steps.tag.outputs.VERSION }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
