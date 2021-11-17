@@ -3,6 +3,9 @@
 *.ko
 *.obj
 *.elf
+*.PBP
+*.prx
+*.SFO
 
 # Precompiled Headers
 *.gch
@@ -31,10 +34,9 @@
 # Debug files
 *.dSYM/
 
-# PSP
-*.prx
-*.PBP
-*.SFO
+# Releases & oputput folders
+release/
+release_oe/
 
 # Built tools
 pspsh/pspsh

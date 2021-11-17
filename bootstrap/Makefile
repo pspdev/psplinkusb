@@ -1,5 +1,5 @@
 release: all
-	mksfoex -d MEMSIZE=1 'PSPLink v3.0.1' PARAM.SFO
+	mksfoex -d MEMSIZE=1 'PSPLink v3.0.2' PARAM.SFO
 	pack-pbp EBOOT.PBP PARAM.SFO psplink.png NULL NULL NULL NULL psplink_boot.prx NULL
 
 clean_release:
@@ -10,7 +10,7 @@ TARGET = psplink_boot
 OBJS = main.o
 
 INCDIR =
-CFLAGS = -O2 -G0 -Wall
+CFLAGS = -O2 -G0 -Wall -g
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS = $(CFLAGS)
 

@@ -12,6 +12,6 @@
 #ifndef __VERSION_H__
 #define __VERSION_H__
 
-#define PSPLINK_VERSION "v3.0.1"
+#define PSPLINK_VERSION "v3.0.2"
 
 #endif

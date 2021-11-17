@@ -1,4 +1,4 @@
-# PSPLINK 3.0.1
+# PSPLINK 3.0.2
 
 Please read the manual document for installation instructions and an example
 of usage.
