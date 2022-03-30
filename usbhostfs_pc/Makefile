@@ -19,12 +19,6 @@ CFLAGS += -DREADLINE_SHELL
 LIBS += -lreadline -lcurses
 endif
 
-ifdef BUILD_WIN32
-CFLAGS  += -I../windows/lib -Wno-format
-LDFLAGS += -L../windows/lib
-OUTPUT := $(OUTPUT).exe
-endif
-
 all: $(OUTPUT)
 
 $(OUTPUT): $(OBJS)
