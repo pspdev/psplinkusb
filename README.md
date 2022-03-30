@@ -96,11 +96,7 @@ psp-addr2line -e myhomebrew address
 
 Replace ``address`` with the actual adress and replace myhomebrew with the name of the elf file. This is **NOT** the ``.prx`` file and either has no extension or ``.elf`` depending on the build system used.
 
-If no result is returned, make sure to build with the ``-g`` or``-g3`` option to make sure psp-addr2line knowns the function names and locations. 
-
-## Debuging with GDB
-
-GDB is the GNU Debugger. It can be used in combination with PSPLINK and usbhostfs_pc.
+If no result is returned, make sure to build with the ``-g`` or``-g3`` option to make sure psp-addr2line knowns the function names and locations.
 
 ## Full manual
 
