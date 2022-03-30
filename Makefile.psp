@@ -27,7 +27,6 @@ release: clean all
 	mkdir release/pc/psplink
 	cp psplink/shellcmd.h release/pc/psplink
 	cp -Rf usbhostfs_pc release/pc
-	cp -Rf windows release/pc
 	cp usbhostfs/usbhostfs.h release/pc/usbhostfs_pc
 	cp README.md release
 	cp LICENSE release
