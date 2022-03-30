@@ -77,7 +77,8 @@ jobs:
 
     - name: Compress & Rename artifacts
       run: |
-        zip -r psplink.zip psplinkusb/psplink
+        mv psplinkusb/psplink psplink
+        zip -r psplink.zip psplink
         zip -r pspsh-windows.zip psplinkusb-windows
 
     - name: Create pre-release
