@@ -1,4 +1,4 @@
-PSPLINK allows you to start and debug homebrew for the Playstation Portable through USB. This can speed up development and make finding out what is causing a crash or bug easier. This page explains how to set it up and.
+PSPLINK allows you to start and debug homebrew for the Playstation Portable through USB. This can speed up development and make finding out what is causing a crash or bug easier. This page explains how to set it up and use it.
 
 # Getting started
 
