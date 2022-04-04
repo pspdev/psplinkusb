@@ -41,7 +41,7 @@ jobs:
         uses: egor-tensin/setup-cygwin@v3
         with:
           platform: x64
-          packages: gcc-core gcc-g++ make libreadline7 libreadline-devel libncursesw10 libncurses-devel libusb0 libusb-devel
+          packages: gcc-core gcc-g++ make libreadline7 libreadline-devel libncursesw10 libncurses-devel libusb1.0 libusb1.0-devel
 
       - name: Compile project
         run: |
