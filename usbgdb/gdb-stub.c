@@ -354,6 +354,10 @@ static void handle_query(struct PsplinkContext *ctx, char *str)
 						sprintf(output, "m%08X", threads[thread_loc]);
 						thread_loc++;
 					}
+					else
+					{
+						strcpy(output, "l");
+					}
 				}
 				break;
 
