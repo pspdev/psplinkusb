@@ -14,7 +14,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <ctype.h>
-#include <usb.h>
+#include <libusb.h>
 #include <limits.h>
 #include <fcntl.h>
 #include <usbhostfs.h>
@@ -98,7 +98,7 @@ struct DirHandle
 struct FileHandle open_files[MAX_FILES];
 struct DirHandle  open_dirs[MAX_DIRS];
 
-static usb_dev_handle *g_hDev = NULL;
+static libusb_device_handle *g_hDev = NULL;
 
 static int g_servsocks[MAX_ASYNC_CHANNELS];
 static int g_clientsocks[MAX_ASYNC_CHANNELS];
@@ -207,7 +207,7 @@ int is_dir(const char *path)
 }
 
 /* Define wrappers for the usb functions we use which can set euid */
-int euid_usb_bulk_write(usb_dev_handle *dev, int ep, char *bytes, int size,
+int euid_usb_bulk_write(libusb_device_handle *dev, int ep, char *bytes, int size,
 	int timeout)
 {
 	int ret;
@@ -217,7 +217,7 @@ int euid_usb_bulk_write(usb_dev_handle *dev, int ep, char *bytes, int size,
 
 	seteuid(0);
 	setegid(0);
-	ret = usb_bulk_write(dev, ep, bytes, size, timeout);
+	libusb_bulk_transfer(dev, ep, bytes, size, &ret, timeout);
 	seteuid(getuid());
 	setegid(getgid());
 
@@ -226,7 +226,7 @@ int euid_usb_bulk_write(usb_dev_handle *dev, int ep, char *bytes, int size,
 	return ret;
 }
 
-int euid_usb_bulk_read(usb_dev_handle *dev, int ep, char *bytes, int size,
+int euid_usb_bulk_read(libusb_device_handle *dev, int ep, char *bytes, int size,
 	int timeout)
 {
 	int ret;
@@ -235,7 +235,7 @@ int euid_usb_bulk_read(usb_dev_handle *dev, int ep, char *bytes, int size,
 			dev, ep, bytes, size, timeout);
 	seteuid(0);
 	setegid(0);
-	ret = usb_bulk_read(dev, ep, bytes, size, timeout);
+	libusb_bulk_transfer(dev, ep, bytes, size, &ret, timeout);
 	seteuid(getuid());
 	setegid(getgid());
 
@@ -244,57 +244,56 @@ int euid_usb_bulk_read(usb_dev_handle *dev, int ep, char *bytes, int size,
 	return ret;
 }
 
-usb_dev_handle *open_device(struct usb_bus *busses)
+libusb_device_handle *open_device(libusb_device **devices, ssize_t deviceCount)
 {
-	struct usb_bus *bus = NULL;
-	struct usb_dev_handle *hDev = NULL;
+	libusb_device_handle *hDev = NULL;
 
 	seteuid(0);
 	setegid(0);
 
-	for(bus = busses; bus; bus = bus->next) 
+	for(int i = 0; i < deviceCount; i++)
 	{
-		struct usb_device *dev;
+		libusb_device *device = devices[i];
+		struct libusb_device_descriptor descriptor;
 
-		for(dev = bus->devices; dev; dev = dev->next)
+		libusb_get_device_descriptor(device, &descriptor);
+		if((descriptor.idVendor == SONY_VID)
+			&& (descriptor.idProduct == g_pid))
 		{
-			if((dev->descriptor.idVendor == SONY_VID) 
-				&& (dev->descriptor.idProduct == g_pid))
+			libusb_open(device, &hDev);
+			if(hDev != NULL)
 			{
-				hDev = usb_open(dev);
-				if(hDev != NULL)
-				{
-					int ret;
-					ret = usb_set_configuration(hDev, 1);
+				int ret;
+
+				ret = libusb_set_configuration(hDev, 1);
 #ifndef NO_UID_CHECK
-					if((ret < 0) && (errno == EPERM) && geteuid()) {
-						fprintf(stderr,
-							"Permission error while opening the USB device.\n"
-							"Fix device permissions or run as root.\n");
-						usb_close(hDev);
-						exit(1);
-					}
+				if((ret < 0) && (errno == EPERM) && geteuid()) {
+					fprintf(stderr,
+						"Permission error while opening the USB device.\n"
+						"Fix device permissions or run as root.\n");
+					libusb_close(hDev);
+					exit(1);
+				}
 #endif
+				if(ret == 0)
+				{
+					ret = libusb_claim_interface(hDev, 0);
 					if(ret == 0)
 					{
-						ret = usb_claim_interface(hDev, 0);
-						if(ret == 0)
-						{
-							seteuid(getuid());
-							setegid(getgid());
-							return hDev;
-						}
-						else
-						{
-							usb_close(hDev);
-							hDev = NULL;
-						}
+						seteuid(getuid());
+						setegid(getgid());
+						return hDev;
 					}
 					else
 					{
-						usb_close(hDev);
+						libusb_close(hDev);
 						hDev = NULL;
 					}
+				}
+				else
+				{
+					libusb_close(hDev);
+					hDev = NULL;
 				}
 			}
 		}
@@ -302,7 +301,7 @@ usb_dev_handle *open_device(struct usb_bus *busses)
 	
 	if(hDev)
 	{
-		usb_close(hDev);
+		libusb_close(hDev);
 	}
 
 	seteuid(getuid());
@@ -311,15 +310,15 @@ usb_dev_handle *open_device(struct usb_bus *busses)
 	return NULL;
 }
 
-void close_device(struct usb_dev_handle *hDev)
+void close_device(struct libusb_device_handle *hDev)
 {
 	seteuid(0);
 	setegid(0);
 	if(hDev)
 	{
-		usb_release_interface(hDev, 0);
-		usb_reset(hDev);
-		usb_close(hDev);
+		libusb_release_interface(hDev, 0);
+		libusb_reset_device(hDev);
+		libusb_close(hDev);
 	}
 	seteuid(getuid());
 	setegid(getgid());
@@ -853,7 +852,7 @@ int dir_close(int did)
 	return ret;
 }
 
-int handle_hello(struct usb_dev_handle *hDev)
+int handle_hello(struct libusb_device_handle *hDev)
 {
 	struct HostFsHelloResp resp;
 
@@ -861,10 +860,10 @@ int handle_hello(struct usb_dev_handle *hDev)
 	resp.cmd.magic = LE32(HOSTFS_MAGIC);
 	resp.cmd.command = LE32(HOSTFS_CMD_HELLO);
 
-	return usb_bulk_write(hDev, 0x2, (char *) &resp, sizeof(resp), 10000);
+	return libusb_bulk_transfer(hDev, 0x2, (char *) &resp, sizeof(resp), NULL, 10000);
 }
 
-int handle_open(struct usb_dev_handle *hDev, struct HostFsOpenCmd *cmd, int cmdlen)
+int handle_open(struct libusb_device_handle *hDev, struct HostFsOpenCmd *cmd, int cmdlen)
 {
 	struct HostFsOpenResp resp;
 	int  ret = -1;
@@ -908,7 +907,7 @@ int handle_open(struct usb_dev_handle *hDev, struct HostFsOpenCmd *cmd, int cmdl
 	return ret;
 }
 
-int handle_dopen(struct usb_dev_handle *hDev, struct HostFsDopenCmd *cmd, int cmdlen)
+int handle_dopen(struct libusb_device_handle *hDev, struct HostFsDopenCmd *cmd, int cmdlen)
 {
 	struct HostFsDopenResp resp;
 	int  ret = -1;
@@ -982,7 +981,7 @@ int fixed_write(int fd, const void *data, int len)
 	return byteswrite;
 }
 
-int handle_write(struct usb_dev_handle *hDev, struct HostFsWriteCmd *cmd, int cmdlen)
+int handle_write(struct libusb_device_handle *hDev, struct HostFsWriteCmd *cmd, int cmdlen)
 {
 	static char write_block[HOSTFS_MAX_BLOCK];
 	struct HostFsWriteResp resp;
@@ -1076,7 +1075,7 @@ int fixed_read(int fd, void *data, int len)
 	return bytesread;
 }
 
-int handle_read(struct usb_dev_handle *hDev, struct HostFsReadCmd *cmd, int cmdlen)
+int handle_read(struct libusb_device_handle *hDev, struct HostFsReadCmd *cmd, int cmdlen)
 {
 	static char read_block[HOSTFS_MAX_BLOCK];
 	struct HostFsReadResp resp;
@@ -1143,7 +1142,7 @@ int handle_read(struct usb_dev_handle *hDev, struct HostFsReadCmd *cmd, int cmdl
 	return ret;
 }
 
-int handle_close(struct usb_dev_handle *hDev, struct HostFsCloseCmd *cmd, int cmdlen)
+int handle_close(struct libusb_device_handle *hDev, struct HostFsCloseCmd *cmd, int cmdlen)
 {
 	struct HostFsCloseResp resp;
 	int  ret = -1;
@@ -1194,7 +1193,7 @@ int handle_close(struct usb_dev_handle *hDev, struct HostFsCloseCmd *cmd, int cm
 	return ret;
 }
 
-int handle_dclose(struct usb_dev_handle *hDev, struct HostFsDcloseCmd *cmd, int cmdlen)
+int handle_dclose(struct libusb_device_handle *hDev, struct HostFsDcloseCmd *cmd, int cmdlen)
 {
 	struct HostFsDcloseResp resp;
 	int  ret = -1;
@@ -1225,7 +1224,7 @@ int handle_dclose(struct usb_dev_handle *hDev, struct HostFsDcloseCmd *cmd, int 
 	return ret;
 }
 
-int handle_dread(struct usb_dev_handle *hDev, struct HostFsDreadCmd *cmd, int cmdlen)
+int handle_dread(struct libusb_device_handle *hDev, struct HostFsDreadCmd *cmd, int cmdlen)
 {
 	struct HostFsDreadResp resp;
 	SceIoDirent *dir = NULL;
@@ -1290,7 +1289,7 @@ int handle_dread(struct usb_dev_handle *hDev, struct HostFsDreadCmd *cmd, int cm
 	return ret;
 }
 
-int handle_lseek(struct usb_dev_handle *hDev, struct HostFsLseekCmd *cmd, int cmdlen)
+int handle_lseek(struct libusb_device_handle *hDev, struct HostFsLseekCmd *cmd, int cmdlen)
 {
 	struct HostFsLseekResp resp;
 	int  ret = -1;
@@ -1337,7 +1336,7 @@ int handle_lseek(struct usb_dev_handle *hDev, struct HostFsLseekCmd *cmd, int cm
 	return ret;
 }
 
-int handle_remove(struct usb_dev_handle *hDev, struct HostFsRemoveCmd *cmd, int cmdlen)
+int handle_remove(struct libusb_device_handle *hDev, struct HostFsRemoveCmd *cmd, int cmdlen)
 {
 	struct HostFsRemoveResp resp;
 	int  ret = -1;
@@ -1392,7 +1391,7 @@ int handle_remove(struct usb_dev_handle *hDev, struct HostFsRemoveCmd *cmd, int 
 	return ret;
 }
 
-int handle_rmdir(struct usb_dev_handle *hDev, struct HostFsRmdirCmd *cmd, int cmdlen)
+int handle_rmdir(struct libusb_device_handle *hDev, struct HostFsRmdirCmd *cmd, int cmdlen)
 {
 	struct HostFsRmdirResp resp;
 	int  ret = -1;
@@ -1447,7 +1446,7 @@ int handle_rmdir(struct usb_dev_handle *hDev, struct HostFsRmdirCmd *cmd, int cm
 	return ret;
 }
 
-int handle_mkdir(struct usb_dev_handle *hDev, struct HostFsMkdirCmd *cmd, int cmdlen)
+int handle_mkdir(struct libusb_device_handle *hDev, struct HostFsMkdirCmd *cmd, int cmdlen)
 {
 	struct HostFsMkdirResp resp;
 	int  ret = -1;
@@ -1502,7 +1501,7 @@ int handle_mkdir(struct usb_dev_handle *hDev, struct HostFsMkdirCmd *cmd, int cm
 	return ret;
 }
 
-int handle_getstat(struct usb_dev_handle *hDev, struct HostFsGetstatCmd *cmd, int cmdlen)
+int handle_getstat(struct libusb_device_handle *hDev, struct HostFsGetstatCmd *cmd, int cmdlen)
 {
 	struct HostFsGetstatResp resp;
 	SceIoStat st;
@@ -1654,7 +1653,7 @@ int psp_chstat(const char *path, struct HostFsChstatCmd *cmd)
 	return 0;
 }
 
-int handle_chstat(struct usb_dev_handle *hDev, struct HostFsChstatCmd *cmd, int cmdlen)
+int handle_chstat(struct libusb_device_handle *hDev, struct HostFsChstatCmd *cmd, int cmdlen)
 {
 	struct HostFsChstatResp resp;
 	int  ret = -1;
@@ -1702,7 +1701,7 @@ int handle_chstat(struct usb_dev_handle *hDev, struct HostFsChstatCmd *cmd, int 
 	return ret;
 }
 
-int handle_rename(struct usb_dev_handle *hDev, struct HostFsRenameCmd *cmd, int cmdlen)
+int handle_rename(struct libusb_device_handle *hDev, struct HostFsRenameCmd *cmd, int cmdlen)
 {
 	struct HostFsRenameResp resp;
 	int  ret = -1;
@@ -1785,7 +1784,7 @@ int handle_rename(struct usb_dev_handle *hDev, struct HostFsRenameCmd *cmd, int 
 	return ret;
 }
 
-int handle_chdir(struct usb_dev_handle *hDev, struct HostFsChdirCmd *cmd, int cmdlen)
+int handle_chdir(struct libusb_device_handle *hDev, struct HostFsChdirCmd *cmd, int cmdlen)
 {
 	struct HostFsChdirResp resp;
 	int  ret = -1;
@@ -1836,7 +1835,7 @@ int handle_chdir(struct usb_dev_handle *hDev, struct HostFsChdirCmd *cmd, int cm
 	return ret;
 }
 
-int handle_ioctl(struct usb_dev_handle *hDev, struct HostFsIoctlCmd *cmd, int cmdlen)
+int handle_ioctl(struct libusb_device_handle *hDev, struct HostFsIoctlCmd *cmd, int cmdlen)
 {
 	static char inbuf[64*1024];
 	static char outbuf[64*1024];
@@ -1948,7 +1947,7 @@ int get_drive_info(struct DevctlGetInfo *info, unsigned int drive)
 	return ret;
 }
 
-int handle_devctl(struct usb_dev_handle *hDev, struct HostFsDevctlCmd *cmd, int cmdlen)
+int handle_devctl(struct libusb_device_handle *hDev, struct HostFsDevctlCmd *cmd, int cmdlen)
 {
 	static char inbuf[64*1024];
 	static char outbuf[64*1024];
@@ -2014,25 +2013,27 @@ int handle_devctl(struct usb_dev_handle *hDev, struct HostFsDevctlCmd *cmd, int 
 	return ret;
 }
 
-usb_dev_handle *wait_for_device(void)
+libusb_device_handle *wait_for_device(void)
 {
-	usb_dev_handle *hDev = NULL;
+	libusb_device_handle *hDev = NULL;
+	libusb_device **devices;
+	ssize_t deviceCount;
 
-	while(hDev == NULL)
-	{
-		usb_find_busses();
-		usb_find_devices();
-
-		hDev = open_device(usb_get_busses());
-		if(hDev)
-		{
-			fprintf(stderr, "Connected to device\n");
-			break;
+	while(hDev == NULL) {
+		deviceCount = libusb_get_device_list(NULL, &devices);
+		if(deviceCount > 0) {
+			hDev = open_device(devices, deviceCount);
+			if(hDev)
+			{
+				fprintf(stderr, "Connected to device\n");
+				break;
+			}
 		}
-
 		/* Sleep for one second */
 		sleep(1);
 	}
+
+	libusb_free_device_list(devices, 1);
 
 	return hDev;
 }
@@ -2255,7 +2256,6 @@ int start_hostfs(void)
 		if(g_hDev)
 		{
 			uint32_t magic;
-
 			magic = LE32(HOSTFS_MAGIC);
 
 			if(euid_usb_bulk_write(g_hDev, 0x2, (char *) &magic, sizeof(magic), 1000) == sizeof(magic))
@@ -2467,6 +2467,7 @@ int exit_app(void)
 		setegid(0);
 		close_device(g_hDev);
 	}
+	libusb_exit(NULL);
 	exit(1);
 
 	return 0;
@@ -3119,7 +3120,7 @@ int main(int argc, char **argv)
 	if(parse_args(argc, argv))
 	{
 		pthread_t thid;
-		usb_init();
+		libusb_init(NULL);
 
 		signal(SIGINT, signal_handler);
 		signal(SIGTERM, signal_handler);
@@ -3167,5 +3168,6 @@ int main(int argc, char **argv)
 		print_help();
 	}
 
+	libusb_exit(NULL);
 	return 0;
 }
