@@ -2023,11 +2023,32 @@ usb_dev_handle *wait_for_device(void)
 		usb_find_busses();
 		usb_find_devices();
 
-		hDev = open_device(usb_get_busses());
-		if(hDev)
+		struct usb_bus * busses = usb_get_busses();
+
+		if (!busses)
 		{
-			fprintf(stderr, "Connected to device\n");
-			break;
+			fprintf(stderr, "no busses found\n");
+		}
+		else
+		{
+			hDev = open_device(busses);
+			if(hDev)
+			{
+				fprintf(stderr, "Connected to device\n");
+				break;
+			}
+		
+			if (!hDev)
+			{
+				fprintf(stderr, "waiting for device...\n");
+			}
+
+			hDev = open_device(usb_get_busses());
+			if(hDev)
+			{
+				fprintf(stderr, "Connected to device\n");
+				break;
+			}
 		}
 
 		/* Sleep for one second */
