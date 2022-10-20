@@ -52,7 +52,7 @@ Now PSPLINK can be used without sudo. See below how to do that.
 
 ## Using PSPLINK
 
-To be able to use PSPLINK with Playstation Portable homebrew, the homebrew will need to be build into an unencrypted ``.prx`` file. This can be done by running CMake like ``psp-cmake -DBUILD_PRX=1 .`` or if you're using a Makefile by adding ``BUILD_PRX=1`` to it. The build the homebrew.
+To be able to use PSPLINK with Playstation Portable homebrew, the homebrew will need to be build into an unencrypted ``.prx`` file. This can be done by running CMake like ``psp-cmake -DBUILD_PRX=1 .`` or if you're using a Makefile by adding ``BUILD_PRX=1`` to it. Then build the homebrew.
 
 In the build directory, open a terminal and run the following program:
 
