@@ -15,7 +15,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        apk add build-base readline-dev libusb-compat-dev
+        apk add build-base linux-headers readline-dev libusb-compat-dev
 
     - name: Compile project
       run: |
