@@ -22,7 +22,7 @@ Depending on the operating system used the setup on PC is different. Follow the 
 
 On Windows a driver needs to be installed before PSPLINK can be used. To do this take the following steps:
 
-1. Make sure the programs ``usbhostfs_pc`` and ``pspsh`` are available from the msys2 terminal. Otherwise download them [here](https://github.com/pspdev/psplinkusb/releases/download/latest/pspsh-windows.zip).
+1. Make sure the programs ``usbhostfs_pc`` and ``pspsh`` are available in cmd. Otherwise download them [here](https://github.com/pspdev/psplinkusb/releases/download/latest/pspsh-windows.zip).
 2. Start PSPLINK on the Playstation Portable and connect it to the computer through USB.
 3. Download [Zadig](https://zadig.akeo.ie/) and start it. It will ask if you want to run it as administrator, click yes.
 4. In Zadig, click on ``options`` -> ``List All Devices``.
