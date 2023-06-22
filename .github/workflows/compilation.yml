@@ -70,11 +70,6 @@ jobs:
     steps:
     - uses: actions/download-artifact@v2
 
-    - name: Extract tag name
-      if: startsWith(github.ref, 'refs/tags/')
-      id: tag
-      run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
-
     - name: Compress & Rename artifacts
       run: |
         mv psplinkusb/psplink psplink
@@ -103,6 +98,6 @@ jobs:
           psplink.zip
           pspsh-windows.zip
           release/psplink_manual.pdf
-        tag_name: ${{ steps.tag.outputs.VERSION }}
+        tag_name: ${{ github.ref_name }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
