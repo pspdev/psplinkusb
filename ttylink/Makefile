@@ -2,7 +2,7 @@ OUTPUT=ttylink
 OBJS=ttylink.o
 
 CFLAGS=-Wall -g 
-LIBS=-lreadline -lcurses
+LIBS=-lreadline
 
 all: ttylink
 

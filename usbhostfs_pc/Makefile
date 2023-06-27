@@ -16,7 +16,7 @@ endif
 
 ifdef READLINE_SHELL
 CFLAGS += -DREADLINE_SHELL
-LIBS += -lreadline -lcurses
+LIBS += -lreadline
 endif
 
 all: $(OUTPUT)
