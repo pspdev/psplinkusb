@@ -8,7 +8,7 @@ else
 endif
 
 CXXFLAGS+= -Wall -D_PCTERM -I../psplink
-LIBS=-lreadline -lcurses
+LIBS=-lreadline
 
 PREFIX=$(shell psp-config --pspdev-path 2> /dev/null)
 
