@@ -98,6 +98,64 @@ Replace ``address`` with the actual adress and replace myhomebrew with the name 
 
 If no result is returned, make sure to build with the ``-g`` or``-g3`` option to make sure psp-addr2line knowns the function names and locations.
 
+## Debugging with GDB
+
+Sometimes debugging with the built in instruction level debugger is not enough, this is where
+PSPLINK's GDB Server can come in handy.
+
+Let's get started:
+
+### Preparation
+
+Prepare a separate terminal for `usbhostfs_pc`, `pspsh` and `psp-gdb`. All of them are needed to point the directory location to your `.prx` and `.elf` files located or the file you need to debug.
+
+### 1. usbhostfs_pc
+
+Run `usbhostfs_pc` on your terminal dedicated for `usbhostfs_pc` and you will see the `waiting for device...` status and then start the PSPLINK app on your PSP and connect the USB cable, you will see the `connected to device` status, it means success. do not close this terminal after that.
+
+### 2. pspsh
+
+Run `pspsh` on your terminal dedicated for `pspsh` and you will see the `host0:/>`. After that you need to change again the directory where your files needed to debug. lastly, run `debug <file.prx>` and it will display something like this:
+
+> You need to replace `<file.prx>`  with the file you need to debug. PRX file not ELF.
+
+```sh
+PSPLink USB GDBServer (c) 2k7 TyRaNiD
+host0:/> Loaded host0:/<file.prx> - UID 0x0408A763, Entry 0x088040AC
+```
+
+It means the debuggee is succesfully loaded. You can type `reset` if there's something wrong with your GDBServer.
+
+### 3. psp-gdb
+
+Run `psp-gdb <file.elf> -q` on your terminal dedicated for `psp-gdb` and you will see something like this:
+
+> You need to replace `<file.elf>`  with the file you need to debug. ELF file not PRX.
+
+```sh
+Reading symbols from <filename>...
+(gdb)
+```
+> `<filename>` is the name of your current debuggee.
+
+then type the `target remote :10001` to connect to your GDBServer and you will see the gdb output something like this:
+
+```sh
+Remote debugging using :10001
+_start (args=0, argp=0x0) at crt0_prx.c:103
+103         if (&sce_newlib_nocreate_thread_in_start != NULL) {
+(gdb)
+```
+This will display the `_start` routine, it means you succesfully connected and ready to the debug your app!
+
+These are the following commands used in psp-gdb:
+- `b` or `break` - for setting breakpoints
+- `c` - for continue
+- `s` - for stepping
+- `bt` - for getting stacktrace
+
+You can type `help` for more information about the psp-gdb commands.
+
 ## Full manual
 
 If you need any additional information, check out the [complete online manual](psplink_manual.pdf).
