@@ -119,9 +119,9 @@ Now start the PSPLINK app on your PSP and connect the USB cable. You should see 
 
 ### 2. pspsh
 
-Run `pspsh` on your terminal dedicated for `pspsh` and you will see the `host0:/>`. After that you need to change again the directory where your files needed to debug. lastly, run `debug <file.prx>` and it will display something like this:
+Run `pspsh` on your terminal dedicated for `pspsh` and you will see the `host0:/>`. Now run `debug file.prx`, and it will display something like this:
 
-> You need to replace `<file.prx>`  with the file you need to debug. PRX file not ELF.
+> You need to replace `file.prx`  with the file you need to debug. PRX file not ELF.
 
 ```sh
 PSPLink USB GDBServer (c) 2k7 TyRaNiD
