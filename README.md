@@ -132,9 +132,9 @@ It means the debuggee is succesfully loaded. You can type `reset` if there's som
 
 ### 3. psp-gdb
 
-Run `psp-gdb <file.elf> -q` on your terminal dedicated for `psp-gdb` and you will see something like this:
+Run `psp-gdb file -q` on your terminal dedicated for `psp-gdb` and you will see something like this:
 
-> You need to replace `<file.elf>`  with the file you need to debug. ELF file not PRX.
+> You need to replace `file` with an elf file you need to debug. They have the same name as your loaded `.prx` file in the pspsh.
 
 ```sh
 Reading symbols from <filename>...
