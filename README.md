@@ -111,7 +111,7 @@ Prepare a separate terminal for `usbhostfs_pc`, `pspsh` and `psp-gdb`. Open all 
 
 ### 1. usbhostfs_pc
 
-Run `usbhostfs_pc` on your terminal dedicated for `usbhostfs_pc` and you will see the `waiting for device...` status and then start the PSPLINK app on your PSP and connect the USB cable, you will see the `connected to device` status, it means success. do not close this terminal after that.
+Run `usbhostfs_pc` on your terminal dedicated for `usbhostfs_pc` and you will see the `waiting for device...` status. Now start the PSPLINK app on your PSP and connect the USB cable. You should see the `connected to device` status in the terminal, which means success. Do not close this terminal after that.
 
 ### 2. pspsh
 
