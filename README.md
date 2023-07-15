@@ -107,7 +107,7 @@ Let's get started:
 
 ### Preparation
 
-Prepare a separate terminal for `usbhostfs_pc`, `pspsh` and `psp-gdb`. All of them are needed to point the directory location to your `.prx` and `.elf` files located or the file you need to debug.
+Prepare a separate terminal for `usbhostfs_pc`, `pspsh` and `psp-gdb`. Open all of them in the directory in which your compiled `.prx` and `.elf` files are located.
 
 ### 1. usbhostfs_pc
 
