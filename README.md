@@ -152,11 +152,14 @@ _start (args=0, argp=0x0) at crt0_prx.c:103
 ```
 This will display the `_start` routine, it means you succesfully connected and ready to the debug your app!
 
-These are the following commands used in psp-gdb:
+Here are a few useful commands for getting around in psp-gdb:
 - `b` or `break` - for setting breakpoints
-- `c` - for continue
-- `s` - for stepping
-- `bt` - for getting stacktrace
+- `c` or `continue` - for resuming program execution until the next breakpoint or program completion
+- `s` or `step` - for executing the current line and, if it contains a function call, step into that function
+- `n` or `next` - for executing the current line, but if it contains a function call, step over it without diving into the function
+- `f` or `finish` - for executing the remaining lines of the current function and return to the caller
+- `bt` or `backtrace` - for getting stacktrace
+- `d` or `delete` - for deleting all breakpoints
 
 You can type `help` for more information about the psp-gdb commands.
 
