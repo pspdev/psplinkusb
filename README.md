@@ -159,6 +159,8 @@ Here are a few useful commands for getting around in psp-gdb:
 - `n` or `next` - for executing the current line, but if it contains a function call, step over it without diving into the function
 - `f` or `finish` - for executing the remaining lines of the current function and return to the caller
 - `bt` or `backtrace` - for getting stacktrace
+- `p $var` or `print $var` - for displaying the value of specific variable
+- `i r` or `info registers` - for displaying the contents of CPU registers
 - `d` or `delete` - for deleting all breakpoints
 
 You can type `help` for more information about the psp-gdb commands.
