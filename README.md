@@ -162,6 +162,7 @@ Here are a few useful commands for getting around in psp-gdb:
 - `p $var` or `print $var` - for displaying the value of specific variable
 - `i r` or `info registers` - for displaying the contents of CPU registers
 - `d` or `delete` - for deleting all breakpoints
+- `q` or `quit` - for exiting from psp-gdb
 
 You can type `help` for more information about the psp-gdb commands.
 
