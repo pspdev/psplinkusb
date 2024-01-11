@@ -107,7 +107,7 @@ Let's get started:
 
 ### Preparation
 
-Prepare a separate terminal for `usbhostfs_pc`, `pspsh` and `psp-gdb`. Open all of them in the directory in which your compiled `.prx` and `.elf` files are located.
+Prepare a separate terminal for `usbhostfs_pc`, `pspsh` and `psp-gdb`. Open all of them in the directory in which your compiled `.prx` and the `elf` (PSP binary) files are located.
 
 ### 1. usbhostfs_pc
 
@@ -132,12 +132,12 @@ It means the debuggee is succesfully loaded. You can type `reset` if there's som
 
 ### 3. psp-gdb
 
-Run `psp-gdb file -q` on your terminal dedicated for `psp-gdb` and you will see something like this:
+In a new terminal run `psp-gdb file -q` and you will see something like this:
 
-> You need to replace `file` with an elf file you need to debug. They have the same name as your loaded `.prx` file in the pspsh.
+> You need to replace `file` with the elf file of the program you're trying to debug. It has the same name as the file loaded in pspsh, but without the `.prx` ending.
 
 ```sh
-Reading symbols from <filename>...
+Reading symbols from <file>...
 (gdb)
 ```
 > `<filename>` is the name of your current debuggee.
