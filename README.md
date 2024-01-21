@@ -136,11 +136,13 @@ In a new terminal run `psp-gdb file -q` and you will see something like this:
 
 > You need to replace `file` with the elf file of the program you're trying to debug. It has the same name as the file loaded in pspsh, but without the `.prx` ending.
 
+> Check if your binary has enabled the debug symbols required for debugging by using `objdump --syms` command and should produce an output but if it says `no symbols` then it is disabled(You can enable it by adding `-g` option to gcc).
+
 ```sh
 Reading symbols from <file>...
 (gdb)
 ```
-> `<filename>` is the name of your current debuggee.
+> `<file>` is the name of your current debuggee.
 
 then type the `target remote :10001` to connect to your GDBServer and you will see the gdb output something like this:
 
