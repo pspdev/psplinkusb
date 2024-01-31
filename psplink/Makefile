@@ -5,7 +5,7 @@ OBJS = main.o shell.o config.o bitmap.o tty.o decodeaddr.o memoryUID.o kmode.o e
 USE_KERNEL_LIBS = 1
 
 INCDIR = ../usbhostfs
-CFLAGS = -Os -Wall -fno-builtin-printf -ggdb
+CFLAGS = -Os -mno-gpopt -Wall -fno-builtin-printf -ggdb
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS = $(CFLAGS)
 LDFLAGS=-nodefaultlibs -L../libusbhostfs_driver

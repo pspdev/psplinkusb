@@ -5,7 +5,7 @@ OBJS = main.o exports.o
 USE_KERNEL_LIBS = 1
 
 INCDIR = 
-CFLAGS = -Os -Wall -fno-builtin-printf -I../usbhostfs
+CFLAGS = -Os -mno-gpopt -Wall -fno-builtin-printf -I../usbhostfs
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS = $(CFLAGS)
 LDFLAGS = -L../libpsplink_driver -L../libusbhostfs_driver

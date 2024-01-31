@@ -9,7 +9,7 @@ clean:
 
 CC=psp-gcc
 INCDIR = 
-CFLAGS = -Os -G0 -Wall -fno-builtin-printf -I$(PSPSDK)/include
+CFLAGS = -Os -mno-gpopt -Wall -fno-builtin-printf -I$(PSPSDK)/include
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS = $(CFLAGS)
 LDFLAGS=-nodefaultlibs

@@ -4,7 +4,7 @@ OBJS = webget.o
 BUILD_PRX=1
 
 INCDIR = 
-CFLAGS = -O2 -G0 -Wall
+CFLAGS = -O2 -mno-gpopt -Wall
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS = $(CFLAGS)
 
