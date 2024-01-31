@@ -10,7 +10,7 @@ TARGET = psplink_boot
 OBJS = main.o
 
 INCDIR =
-CFLAGS = -O2 -G0 -Wall -g
+CFLAGS = -O2 -mno-gpopt -Wall -g
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS = $(CFLAGS)
 

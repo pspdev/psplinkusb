@@ -4,7 +4,7 @@ OBJS = main.o
 BUILD_PRX=1
 
 INCDIR = 
-CFLAGS = -O2 -G0 -Wall -I../../usbhostfs 
+CFLAGS = -O2 -mno-gpopt -Wall -I../../usbhostfs
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS = $(CFLAGS)
 

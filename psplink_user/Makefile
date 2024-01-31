@@ -5,7 +5,7 @@ BUILD_PRX=1
 PRX_EXPORTS=exports.exp
 
 INCDIR = 
-CFLAGS = -O2 -Wall -I../libpsplink
+CFLAGS = -O2 -mno-gpopt -Wall -I../libpsplink
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 LDFLAGS= -nostartfiles -L../libpsplink
 ASFLAGS = $(CFLAGS)
