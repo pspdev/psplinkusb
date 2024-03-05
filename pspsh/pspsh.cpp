@@ -435,7 +435,7 @@ int strlen_cmd(int argc, char **argv)
 {
 	char val[32];
 
-	snprintf(val, sizeof(val), "%d", strlen(argv[0]));
+	snprintf(val, sizeof(val), "%zu", strlen(argv[0]));
 	setenv("?", val, 1);
 
 	return 0;
