@@ -689,14 +689,12 @@ char *command_gen(const char *text, int state)
 {
 	static int cmdno;
 	static int driveno;
-	static int locals;
 	static int len;
 
 	if(state == 0)
 	{
 		cmdno = 0;
 		driveno = 0;
-		locals = 0;
 		len = strlen(text);
 	}
 
