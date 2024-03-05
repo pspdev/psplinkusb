@@ -9,6 +9,7 @@
  *
  */
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <sys/select.h>
@@ -434,7 +435,7 @@ int strlen_cmd(int argc, char **argv)
 {
 	char val[32];
 
-	snprintf(val, sizeof(val), "%d", strlen(argv[0]));
+	snprintf(val, sizeof(val), "%zu", strlen(argv[0]));
 	setenv("?", val, 1);
 
 	return 0;
@@ -688,14 +689,12 @@ char *command_gen(const char *text, int state)
 {
 	static int cmdno;
 	static int driveno;
-	static int locals;
 	static int len;
 
 	if(state == 0)
 	{
 		cmdno = 0;
 		driveno = 0;
-		locals = 0;
 		len = strlen(text);
 	}
 
