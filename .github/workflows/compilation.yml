@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     container: ghcr.io/pspdev/pspsdk:latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
     - name: Install dependencies
       run: |
@@ -27,7 +27,7 @@ jobs:
     
     - name: Upload artifacts
       if: ${{ success() }}
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: psplinkusb
         path: release
@@ -38,9 +38,8 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: Set up Cygwin
-        uses: egor-tensin/setup-cygwin@v3
+        uses: egor-tensin/setup-cygwin@v4
         with:
-          platform: x64
           packages: gcc-core gcc-g++ make libreadline7 libreadline-devel libusb0 libusb-devel
 
       - name: Compile project
@@ -58,7 +57,7 @@ jobs:
 
       - name: Upload artifacts
         if: ${{ success() }}
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: psplinkusb-windows
           path: build
@@ -67,7 +66,7 @@ jobs:
     needs: [build, windows]
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/download-artifact@v2
+    - uses: actions/download-artifact@v4
 
     - name: Compress & Rename artifacts
       run: |
@@ -77,7 +76,7 @@ jobs:
 
     - name: Create pre-release
       if: github.ref == 'refs/heads/master'
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         files: |
           psplink.zip
@@ -91,7 +90,7 @@ jobs:
 
     - name: Release
       if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         files: |
           psplink.zip
