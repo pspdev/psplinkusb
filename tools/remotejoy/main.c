@@ -392,7 +392,7 @@ int screen_thread(SceSize args, void *argp)
 	while(1)
 	{
 		int ret;
-		unsigned int status;
+		uint32_t status;
 		SceUInt timeout;
 
 		timeout = SCREEN_WAIT_TIMEOUT;

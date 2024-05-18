@@ -9,11 +9,14 @@
  * Copyright (c) 2005 Julian T <lovely@crm114.net>
  *
  */
+
+#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 #include <pspkernel.h>
 #include <pspdebug.h>
 #include <pspsdk.h>
-#include <stdio.h>
-#include <string.h>
 #include <pspusb.h>
 #include <pspusbstor.h>
 #include <pspumd.h>
@@ -24,7 +27,6 @@
 #include <pspthreadman_kernel.h>
 #include <pspintrman_kernel.h>
 #include <psppower.h>
-#include <stdint.h>
 #include <usbhostfs.h>
 #include <usbasync.h>
 #include "memoryUID.h"
@@ -1997,7 +1999,7 @@ static int remap_cmd(int argc, char **argv, unsigned int *vRet)
 }
 
 // Iterative function to implement `atoi()` function in C
-static long atoi(const char* S)
+int atoi(const char* S)
 {
     long num = 0;
  
@@ -3132,7 +3134,7 @@ static int scrshot_cmd(int argc, char **argv, unsigned int *vRet)
 	void *frame_addr;
 	int frame_width;
 	int pixel_format;
-	int sync = 1;
+	int sync;
 	int pri = 2;
 	unsigned int p;
 
@@ -3147,7 +3149,7 @@ static int scrshot_cmd(int argc, char **argv, unsigned int *vRet)
 		return CMD_ERROR;
 	}
 
-	if((sceDisplayGetFrameBufferInternal(pri, &frame_addr, &frame_width, &pixel_format, sync) < 0) || (frame_addr == NULL))
+	if((sceDisplayGetFrameBufferInternal(pri, &frame_addr, &frame_width, &pixel_format, &sync) < 0) || (frame_addr == NULL))
 	{
 		SHELL_PRINT("Invalid frame address\n");
 		return CMD_ERROR;

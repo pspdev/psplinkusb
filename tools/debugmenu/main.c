@@ -162,7 +162,7 @@ int main_thread(SceSize args, void *argp)
 	sceCtrlRegisterButtonCallback(3, TRIGGER, button_callback, NULL);
 	while(1)
 	{
-		unsigned int bits;
+		uint32_t bits;
 		if(sceKernelWaitEventFlag(g_eventflag, START_MENU,
 					PSP_EVENT_WAITOR | PSP_EVENT_WAITCLEAR, &bits, NULL) < 0)
 		{
