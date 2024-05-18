@@ -425,7 +425,7 @@ void handle_bp(char *str, int set)
 	unsigned int len;
 	int flags = 0;
 
-	if((!isdigit(str[0])) || (str[1] != ','))
+	if (!(str[0] >= '0' && str[0] <= '9') || (str[1] != ','))
 	{
 		DEBUG_PRINTF("Invalid Z string (%s)\n", str);
 		strcpy(output, "E01");
