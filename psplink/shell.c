@@ -25,6 +25,7 @@
 #include <pspintrman_kernel.h>
 #include <psppower.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <usbhostfs.h>
 #include <usbasync.h>
 #include "memoryUID.h"
