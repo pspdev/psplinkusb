@@ -40,7 +40,7 @@ jobs:
       - name: Set up Cygwin
         uses: egor-tensin/setup-cygwin@v4
         with:
-          packages: gcc-core gcc-g++ make libreadline7 libreadline-devel libusb0 libusb-devel
+          packages: gcc-core gcc-g++ make libreadline7 libreadline-devel libusb0 libusb-devel libncursesw10
 
       - name: Compile project
         run: |
@@ -54,6 +54,7 @@ jobs:
           cp C:\tools\cygwin\bin\cyggcc_s-seh-1.dll build
           cp C:\tools\cygwin\bin\cygreadline7.dll build
           cp C:\tools\cygwin\bin\cygusb0.dll build
+          cp C:\tools\cygwin\bin\cygncursesw-10.dll build
 
       - name: Upload artifacts
         if: ${{ success() }}
