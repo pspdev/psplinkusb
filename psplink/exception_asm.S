@@ -504,6 +504,12 @@ psplinkExceptionHandler:
 	lw		$30, REG_GPR_30($v0)
 	lw		$31, REG_GPR_31($v0)
 
+# Restore HI/LO regs
+	lw		$1,  REG_LO($v0)
+	mtlo	$1
+	lw		$1,  REG_HI($v0)
+	mthi	$1
+
 	lw		$1,  REG_EPC($v0)
 	mtc0    $1,  EPC
 
