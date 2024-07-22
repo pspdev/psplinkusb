@@ -79,3 +79,9 @@ int module_start(SceSize args, void *argp)
 
 	return 0;
 }
+
+// Define _exit too, this is needed because this module is quite messy as it is using some functions from newlib
+void _exit(int status)
+{
+	sceKernelExitGame();
+}
