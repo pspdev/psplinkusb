@@ -30,7 +30,7 @@ release: clean all
 	cp usbhostfs/usbhostfs.h release/pc/usbhostfs_pc
 	cp README.md release
 	cp LICENSE release
-	cp psplink_manual.pdf release
+	cp psplink_manual.odt release
 
 clean:
 	$(MAKE) -C libpsplink clean
