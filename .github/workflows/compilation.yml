@@ -82,7 +82,7 @@ jobs:
         files: |
           psplink.zip
           pspsh-windows.zip
-          release/psplink_manual.pdf
+          release/psplink_manual.odt
         prerelease: true
         name: "Development build"
         tag_name: "latest"
@@ -96,7 +96,7 @@ jobs:
         files: |
           psplink.zip
           pspsh-windows.zip
-          release/psplink_manual.pdf
+          release/psplink_manual.odt
         tag_name: ${{ github.ref_name }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
