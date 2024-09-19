@@ -1080,7 +1080,7 @@ int parse_args(int argc, char **argv, struct Args *args)
 		int ch;
 		int error = 0;
 
-		ch = getopt(argc, argv, "nsrp:h:i:e:");
+		ch = getopt(argc, argv, "nsrvp:h:i:e:");
 		if(ch < 0)
 		{
 			break;
