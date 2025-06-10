@@ -77,7 +77,7 @@ jobs:
 
     - name: Create pre-release
       if: github.ref == 'refs/heads/master'
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v2.2.2
       with:
         files: |
           psplink.zip
@@ -91,7 +91,7 @@ jobs:
 
     - name: Release
       if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v2.2.2
       with:
         files: |
           psplink.zip
