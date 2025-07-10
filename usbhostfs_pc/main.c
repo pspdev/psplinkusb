@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <ctype.h>
+#include <inttypes.h>
 #include <usb.h>
 #include <limits.h>
 #include <fcntl.h>
@@ -1311,7 +1312,7 @@ int handle_lseek(struct usb_dev_handle *hDev, struct HostFsLseekCmd *cmd, int cm
 		}
 
 		fid = LE32(cmd->fid);
-		V_PRINTF(2, "Lseek command fid: %d, ofs: %lld, whence: %d\n", fid, LE64(cmd->ofs), LE32(cmd->whence));
+		V_PRINTF(2, "Lseek command fid: %d, ofs: %" PRIu64 ", whence: %d\n", fid, LE64(cmd->ofs), LE32(cmd->whence));
 		if((fid > STDERR_FILENO) && (fid < MAX_FILES) && (open_files[fid].opened))
 		{
 			/* TODO: Probably should ensure whence is mapped across, just in case */
@@ -2209,7 +2210,7 @@ void do_async(struct AsyncCommand *cmd, int readlen)
 
 	V_PRINTF(2, "Async Magic: %08X\n", LE32(cmd->magic));
 	V_PRINTF(2, "Async Channel: %08X\n", LE32(cmd->channel));
-	V_PRINTF(2, "Async Extra Len: %d\n", readlen - sizeof(struct AsyncCommand));
+	V_PRINTF(2, "Async Extra Len: %d\n", readlen - (int)sizeof(struct AsyncCommand));
 
 	if(readlen > sizeof(struct AsyncCommand))
 	{
@@ -2420,7 +2421,7 @@ int parse_args(int argc, char **argv)
 			if(argv[i][0] != '/')
 			{
 				char tmpdir[PATH_MAX];
-				snprintf(tmpdir, PATH_MAX, "%s/%s", g_rootdir, argv[i]);
+				snprintf(tmpdir, sizeof(tmpdir), "%s/%s", g_rootdir, argv[i]);
 				strcpy(g_drives[i].rootdir, tmpdir);
 			}
 			else
