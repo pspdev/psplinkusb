@@ -15,7 +15,7 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <inttypes.h>
-#include <usb.h>
+#include <libusb-1.0/libusb.h>
 #include <limits.h>
 #include <fcntl.h>
 #include <usbhostfs.h>
@@ -99,7 +99,8 @@ struct DirHandle
 struct FileHandle open_files[MAX_FILES];
 struct DirHandle  open_dirs[MAX_DIRS];
 
-static usb_dev_handle *g_hDev = NULL;
+static libusb_context *usbctx = NULL;
+static libusb_device_handle *usbhdr = NULL;
 
 static int g_servsocks[MAX_ASYNC_CHANNELS];
 static int g_clientsocks[MAX_ASYNC_CHANNELS];
@@ -208,17 +209,19 @@ int is_dir(const char *path)
 }
 
 /* Define wrappers for the usb functions we use which can set euid */
-int euid_usb_bulk_write(usb_dev_handle *dev, int ep, char *bytes, int size,
+int euid_usb_bulk_write(libusb_device_handle *dev, int ep, char *bytes, int size,
 	int timeout)
 {
-	int ret;
+	int wrbytes;
 
-	V_PRINTF(2, "Bulk Write dev %p, ep 0x%x, bytes %p, size %d, timeout %d\n", 
+	V_PRINTF(2, "Bulk Write dev %p, ep 0x%x, bytes %p, size %d, timeout %d\n",
 			dev, ep, bytes, size, timeout);
 
 	seteuid(0);
 	setegid(0);
-	ret = usb_bulk_write(dev, ep, bytes, size, timeout);
+	int ret = libusb_bulk_transfer(dev, ep, (unsigned char*)bytes, size, &wrbytes, timeout);
+	if (!ret)
+		ret = wrbytes;
 	seteuid(getuid());
 	setegid(getgid());
 
@@ -227,16 +230,18 @@ int euid_usb_bulk_write(usb_dev_handle *dev, int ep, char *bytes, int size,
 	return ret;
 }
 
-int euid_usb_bulk_read(usb_dev_handle *dev, int ep, char *bytes, int size,
+int euid_usb_bulk_read(libusb_device_handle *dev, int ep, char *bytes, int size,
 	int timeout)
 {
-	int ret;
+	int rdbytes;
 
-	V_PRINTF(2, "Bulk Read dev %p, ep 0x%x, bytes %p, size %d, timeout %d\n", 
+	V_PRINTF(2, "Bulk Read dev %p, ep 0x%x, bytes %p, size %d, timeout %d\n",
 			dev, ep, bytes, size, timeout);
 	seteuid(0);
 	setegid(0);
-	ret = usb_bulk_read(dev, ep, bytes, size, timeout);
+	int ret = libusb_bulk_transfer(usbhdr, ep, (unsigned char*)bytes, size, &rdbytes, timeout);
+	if (!ret)
+		ret = rdbytes;
 	seteuid(getuid());
 	setegid(getgid());
 
@@ -245,82 +250,62 @@ int euid_usb_bulk_read(usb_dev_handle *dev, int ep, char *bytes, int size,
 	return ret;
 }
 
-usb_dev_handle *open_device(struct usb_bus *busses)
+libusb_device_handle *open_device(libusb_device *usbdev)
 {
-	struct usb_bus *bus = NULL;
-	struct usb_dev_handle *hDev = NULL;
+	libusb_device_handle *ret = NULL;
 
 	seteuid(0);
 	setegid(0);
 
-	for(bus = busses; bus; bus = bus->next) 
-	{
-		struct usb_device *dev;
+	int r = libusb_open(usbdev, &ret);
+	if (r == LIBUSB_ERROR_ACCESS) {
+		seteuid(getuid());
+		setegid(getgid());
 
-		for(dev = bus->devices; dev; dev = dev->next)
-		{
-			if((dev->descriptor.idVendor == SONY_VID) 
-				&& (dev->descriptor.idProduct == g_pid))
-			{
-				hDev = usb_open(dev);
-				if(hDev != NULL)
-				{
-					int ret;
-					ret = usb_set_configuration(hDev, 1);
-#ifndef NO_UID_CHECK
-					if((ret < 0) && (errno == EPERM) && geteuid()) {
-						fprintf(stderr,
-							"Permission error while opening the USB device.\n"
-							"Fix device permissions or run as root.\n");
-						usb_close(hDev);
-						exit(1);
-					}
-#endif
-					if(ret == 0)
-					{
-						ret = usb_claim_interface(hDev, 0);
-						if(ret == 0)
-						{
-							seteuid(getuid());
-							setegid(getgid());
-							return hDev;
-						}
-						else
-						{
-							usb_close(hDev);
-							hDev = NULL;
-						}
-					}
-					else
-					{
-						usb_close(hDev);
-						hDev = NULL;
-					}
-				}
-			}
-		}
+		fprintf(stderr, "Permission error while opening the USB device.\n");
+
+		#ifndef NO_UID_CHECK
+		if (geteuid())
+			fprintf(stderr, "Fix device permissions or run as root.\n");
+		#endif
+
+		return NULL;
 	}
-	
-	if(hDev)
-	{
-		usb_close(hDev);
+	if (!r) {
+		r = libusb_set_configuration(ret, 1);
+		if (r) {
+			seteuid(getuid());
+			setegid(getgid());
+			fprintf(stderr, "Failed at selecting USB configuration: %d\n", r);
+			return NULL;
+		}
+		r = libusb_claim_interface(ret, 0);
+		if (r) {
+			seteuid(getuid());
+			setegid(getgid());
+			fprintf(stderr, "Failed at claiming USB interface: %d\n", r);
+			return NULL;
+		}
+
+		seteuid(getuid());
+		setegid(getgid());
+		return ret;
 	}
 
 	seteuid(getuid());
 	setegid(getgid());
-
 	return NULL;
 }
 
-void close_device(struct usb_dev_handle *hDev)
+void close_device(libusb_device_handle *dev)
 {
 	seteuid(0);
 	setegid(0);
-	if(hDev)
+	if(dev)
 	{
-		usb_release_interface(hDev, 0);
-		usb_reset(hDev);
-		usb_close(hDev);
+		libusb_release_interface(dev, 0);
+		libusb_reset_device(dev);
+		libusb_close(dev);
 	}
 	seteuid(getuid());
 	setegid(getgid());
@@ -854,7 +839,7 @@ int dir_close(int did)
 	return ret;
 }
 
-int handle_hello(struct usb_dev_handle *hDev)
+int handle_hello(libusb_device_handle *dev)
 {
 	struct HostFsHelloResp resp;
 
@@ -862,10 +847,10 @@ int handle_hello(struct usb_dev_handle *hDev)
 	resp.cmd.magic = LE32(HOSTFS_MAGIC);
 	resp.cmd.command = LE32(HOSTFS_CMD_HELLO);
 
-	return usb_bulk_write(hDev, 0x2, (char *) &resp, sizeof(resp), 10000);
+	return euid_usb_bulk_write(dev, 0x2, (char *) &resp, sizeof(resp), 10000);
 }
 
-int handle_open(struct usb_dev_handle *hDev, struct HostFsOpenCmd *cmd, int cmdlen)
+int handle_open(libusb_device_handle *dev, struct HostFsOpenCmd *cmd, int cmdlen)
 {
 	struct HostFsOpenResp resp;
 	int  ret = -1;
@@ -892,7 +877,7 @@ int handle_open(struct usb_dev_handle *hDev, struct HostFsOpenCmd *cmd, int cmdl
 
 		/* TODO: Should check that length is within a valid range */
 
-		ret = euid_usb_bulk_read(hDev, 0x81, path, LE32(cmd->cmd.extralen), 10000);
+		ret = euid_usb_bulk_read(dev, 0x81, path, LE32(cmd->cmd.extralen), 10000);
 		if(ret != LE32(cmd->cmd.extralen))
 		{
 			fprintf(stderr, "Error reading open data cmd->extralen %ud, ret %d\n", LE32(cmd->cmd.extralen), ret);
@@ -902,14 +887,14 @@ int handle_open(struct usb_dev_handle *hDev, struct HostFsOpenCmd *cmd, int cmdl
 		V_PRINTF(2, "Open command mode %08X mask %08X name %s\n", LE32(cmd->mode), LE32(cmd->mask), path);
 		resp.res = LE32(open_file(LE32(cmd->fsnum), path, LE32(cmd->mode), LE32(cmd->mask)));
 
-		ret = euid_usb_bulk_write(hDev, 0x2, (char *) &resp, sizeof(resp), 10000);
+		ret = euid_usb_bulk_write(dev, 0x2, (char *) &resp, sizeof(resp), 10000);
 	}
 	while(0);
 
 	return ret;
 }
 
-int handle_dopen(struct usb_dev_handle *hDev, struct HostFsDopenCmd *cmd, int cmdlen)
+int handle_dopen(libusb_device_handle *dev, struct HostFsDopenCmd *cmd, int cmdlen)
 {
 	struct HostFsDopenResp resp;
 	int  ret = -1;
@@ -936,7 +921,7 @@ int handle_dopen(struct usb_dev_handle *hDev, struct HostFsDopenCmd *cmd, int cm
 
 		/* TODO: Should check that length is within a valid range */
 
-		ret = euid_usb_bulk_read(hDev, 0x81, path, LE32(cmd->cmd.extralen), 10000);
+		ret = euid_usb_bulk_read(dev, 0x81, path, LE32(cmd->cmd.extralen), 10000);
 		if(ret != LE32(cmd->cmd.extralen))
 		{
 			fprintf(stderr, "Error reading open data cmd->extralen %d, ret %d\n", LE32(cmd->cmd.extralen), ret);
@@ -946,7 +931,7 @@ int handle_dopen(struct usb_dev_handle *hDev, struct HostFsDopenCmd *cmd, int cm
 		V_PRINTF(2, "Dopen command name %s\n", path);
 		resp.res = LE32(dir_open(LE32(cmd->fsnum), path));
 
-		ret = euid_usb_bulk_write(hDev, 0x2, (char *) &resp, sizeof(resp), 10000);
+		ret = euid_usb_bulk_write(dev, 0x2, (char *) &resp, sizeof(resp), 10000);
 	}
 	while(0);
 
@@ -983,7 +968,7 @@ int fixed_write(int fd, const void *data, int len)
 	return byteswrite;
 }
 
-int handle_write(struct usb_dev_handle *hDev, struct HostFsWriteCmd *cmd, int cmdlen)
+int handle_write(libusb_device_handle *dev, struct HostFsWriteCmd *cmd, int cmdlen)
 {
 	static char write_block[HOSTFS_MAX_BLOCK];
 	struct HostFsWriteResp resp;
@@ -1012,7 +997,7 @@ int handle_write(struct usb_dev_handle *hDev, struct HostFsWriteCmd *cmd, int cm
 
 		/* TODO: Should check that length is within a valid range */
 
-		ret = euid_usb_bulk_read(hDev, 0x81, write_block, LE32(cmd->cmd.extralen), 10000);
+		ret = euid_usb_bulk_read(dev, 0x81, write_block, LE32(cmd->cmd.extralen), 10000);
 		if(ret != LE32(cmd->cmd.extralen))
 		{
 			fprintf(stderr, "Error reading write data cmd->extralen %d, ret %d\n", LE32(cmd->cmd.extralen), ret);
@@ -1039,7 +1024,7 @@ int handle_write(struct usb_dev_handle *hDev, struct HostFsWriteCmd *cmd, int cm
 			fprintf(stderr, "Error invalid fid %d\n", fid);
 		}
 
-		ret = euid_usb_bulk_write(hDev, 0x2, (char *) &resp, sizeof(resp), 10000);
+		ret = euid_usb_bulk_write(dev, 0x2, (char *) &resp, sizeof(resp), 10000);
 	}
 	while(0);
 
@@ -1077,7 +1062,7 @@ int fixed_read(int fd, void *data, int len)
 	return bytesread;
 }
 
-int handle_read(struct usb_dev_handle *hDev, struct HostFsReadCmd *cmd, int cmdlen)
+int handle_read(libusb_device_handle *dev, struct HostFsReadCmd *cmd, int cmdlen)
 {
 	static char read_block[HOSTFS_MAX_BLOCK];
 	struct HostFsReadResp resp;
@@ -1127,7 +1112,7 @@ int handle_read(struct usb_dev_handle *hDev, struct HostFsReadCmd *cmd, int cmdl
 			fprintf(stderr, "Error invalid fid %d\n", fid);
 		}
 
-		ret = euid_usb_bulk_write(hDev, 0x2, (char *) &resp, sizeof(resp), 10000);
+		ret = euid_usb_bulk_write(dev, 0x2, (char *) &resp, sizeof(resp), 10000);
 		if(ret < 0)
 		{
 			fprintf(stderr, "Error writing read response (%d)\n", ret);
@@ -1136,7 +1121,7 @@ int handle_read(struct usb_dev_handle *hDev, struct HostFsReadCmd *cmd, int cmdl
 
 		if(LE32(resp.cmd.extralen) > 0)
 		{
-			ret = euid_usb_bulk_write(hDev, 0x2, read_block, LE32(resp.cmd.extralen), 10000);
+			ret = euid_usb_bulk_write(dev, 0x2, read_block, LE32(resp.cmd.extralen), 10000);
 		}
 	}
 	while(0);
@@ -1144,7 +1129,7 @@ int handle_read(struct usb_dev_handle *hDev, struct HostFsReadCmd *cmd, int cmdl
 	return ret;
 }
 
-int handle_close(struct usb_dev_handle *hDev, struct HostFsCloseCmd *cmd, int cmdlen)
+int handle_close(libusb_device_handle *dev, struct HostFsCloseCmd *cmd, int cmdlen)
 {
 	struct HostFsCloseResp resp;
 	int  ret = -1;
@@ -1188,14 +1173,14 @@ int handle_close(struct usb_dev_handle *hDev, struct HostFsCloseCmd *cmd, int cm
 			fprintf(stderr, "Error invalid file id in close command (%d)\n", fid);
 		}
 
-		ret = euid_usb_bulk_write(hDev, 0x2, (char *) &resp, sizeof(resp), 10000);
+		ret = euid_usb_bulk_write(dev, 0x2, (char *) &resp, sizeof(resp), 10000);
 	}
 	while(0);
 
 	return ret;
 }
 
-int handle_dclose(struct usb_dev_handle *hDev, struct HostFsDcloseCmd *cmd, int cmdlen)
+int handle_dclose(libusb_device_handle *dev, struct HostFsDcloseCmd *cmd, int cmdlen)
 {
 	struct HostFsDcloseResp resp;
 	int  ret = -1;
@@ -1218,7 +1203,7 @@ int handle_dclose(struct usb_dev_handle *hDev, struct HostFsDcloseCmd *cmd, int 
 		V_PRINTF(2, "Dclose command did: %d\n", did);
 		resp.res = dir_close(did);
 
-		ret = euid_usb_bulk_write(hDev, 0x2, (char *) &resp, sizeof(resp), 10000);
+		ret = euid_usb_bulk_write(dev, 0x2, (char *) &resp, sizeof(resp), 10000);
 	}
 	while(0);
 
@@ -1226,7 +1211,7 @@ int handle_dclose(struct usb_dev_handle *hDev, struct HostFsDcloseCmd *cmd, int 
 	return ret;
 }
 
-int handle_dread(struct usb_dev_handle *hDev, struct HostFsDreadCmd *cmd, int cmdlen)
+int handle_dread(libusb_device_handle *dev, struct HostFsDreadCmd *cmd, int cmdlen)
 {
 	struct HostFsDreadResp resp;
 	SceIoDirent *dir = NULL;
@@ -1274,7 +1259,7 @@ int handle_dread(struct usb_dev_handle *hDev, struct HostFsDreadCmd *cmd, int cm
 			fprintf(stderr, "Error invalid did %d\n", did);
 		}
 
-		ret = euid_usb_bulk_write(hDev, 0x2, (char *) &resp, sizeof(resp), 10000);
+		ret = euid_usb_bulk_write(dev, 0x2, (char *) &resp, sizeof(resp), 10000);
 		if(ret < 0)
 		{
 			fprintf(stderr, "Error writing dread response (%d)\n", ret);
@@ -1283,7 +1268,7 @@ int handle_dread(struct usb_dev_handle *hDev, struct HostFsDreadCmd *cmd, int cm
 
 		if(LE32(resp.cmd.extralen) > 0)
 		{
-			ret = euid_usb_bulk_write(hDev, 0x2, (char *) dir, LE32(resp.cmd.extralen), 10000);
+			ret = euid_usb_bulk_write(dev, 0x2, (char *) dir, LE32(resp.cmd.extralen), 10000);
 		}
 	}
 	while(0);
@@ -1291,7 +1276,7 @@ int handle_dread(struct usb_dev_handle *hDev, struct HostFsDreadCmd *cmd, int cm
 	return ret;
 }
 
-int handle_lseek(struct usb_dev_handle *hDev, struct HostFsLseekCmd *cmd, int cmdlen)
+int handle_lseek(libusb_device_handle *dev, struct HostFsLseekCmd *cmd, int cmdlen)
 {
 	struct HostFsLseekResp resp;
 	int  ret = -1;
@@ -1331,14 +1316,14 @@ int handle_lseek(struct usb_dev_handle *hDev, struct HostFsLseekCmd *cmd, int cm
 			fprintf(stderr, "Error invalid file id in close command (%d)\n", fid);
 		}
 
-		ret = euid_usb_bulk_write(hDev, 0x2, (char *) &resp, sizeof(resp), 10000);
+		ret = euid_usb_bulk_write(dev, 0x2, (char *) &resp, sizeof(resp), 10000);
 	}
 	while(0);
 
 	return ret;
 }
 
-int handle_remove(struct usb_dev_handle *hDev, struct HostFsRemoveCmd *cmd, int cmdlen)
+int handle_remove(libusb_device_handle *dev, struct HostFsRemoveCmd *cmd, int cmdlen)
 {
 	struct HostFsRemoveResp resp;
 	int  ret = -1;
@@ -1366,7 +1351,7 @@ int handle_remove(struct usb_dev_handle *hDev, struct HostFsRemoveCmd *cmd, int 
 
 		/* TODO: Should check that length is within a valid range */
 
-		ret = euid_usb_bulk_read(hDev, 0x81, path, LE32(cmd->cmd.extralen), 10000);
+		ret = euid_usb_bulk_read(dev, 0x81, path, LE32(cmd->cmd.extralen), 10000);
 		if(ret != LE32(cmd->cmd.extralen))
 		{
 			fprintf(stderr, "Error reading remove data cmd->extralen %d, ret %d\n", LE32(cmd->cmd.extralen), ret);
@@ -1386,14 +1371,14 @@ int handle_remove(struct usb_dev_handle *hDev, struct HostFsRemoveCmd *cmd, int 
 			}
 		}
 
-		ret = euid_usb_bulk_write(hDev, 0x2, (char *) &resp, sizeof(resp), 10000);
+		ret = euid_usb_bulk_write(dev, 0x2, (char *) &resp, sizeof(resp), 10000);
 	}
 	while(0);
 
 	return ret;
 }
 
-int handle_rmdir(struct usb_dev_handle *hDev, struct HostFsRmdirCmd *cmd, int cmdlen)
+int handle_rmdir(libusb_device_handle *dev, struct HostFsRmdirCmd *cmd, int cmdlen)
 {
 	struct HostFsRmdirResp resp;
 	int  ret = -1;
@@ -1421,7 +1406,7 @@ int handle_rmdir(struct usb_dev_handle *hDev, struct HostFsRmdirCmd *cmd, int cm
 
 		/* TODO: Should check that length is within a valid range */
 
-		ret = euid_usb_bulk_read(hDev, 0x81, path, LE32(cmd->cmd.extralen), 10000);
+		ret = euid_usb_bulk_read(dev, 0x81, path, LE32(cmd->cmd.extralen), 10000);
 		if(ret != LE32(cmd->cmd.extralen))
 		{
 			fprintf(stderr, "Error reading rmdir data cmd->extralen %d, ret %d\n", LE32(cmd->cmd.extralen), ret);
@@ -1441,14 +1426,14 @@ int handle_rmdir(struct usb_dev_handle *hDev, struct HostFsRmdirCmd *cmd, int cm
 			}
 		}
 
-		ret = euid_usb_bulk_write(hDev, 0x2, (char *) &resp, sizeof(resp), 10000);
+		ret = euid_usb_bulk_write(dev, 0x2, (char *) &resp, sizeof(resp), 10000);
 	}
 	while(0);
 
 	return ret;
 }
 
-int handle_mkdir(struct usb_dev_handle *hDev, struct HostFsMkdirCmd *cmd, int cmdlen)
+int handle_mkdir(libusb_device_handle *dev, struct HostFsMkdirCmd *cmd, int cmdlen)
 {
 	struct HostFsMkdirResp resp;
 	int  ret = -1;
@@ -1476,7 +1461,7 @@ int handle_mkdir(struct usb_dev_handle *hDev, struct HostFsMkdirCmd *cmd, int cm
 
 		/* TODO: Should check that length is within a valid range */
 
-		ret = euid_usb_bulk_read(hDev, 0x81, path, LE32(cmd->cmd.extralen), 10000);
+		ret = euid_usb_bulk_read(dev, 0x81, path, LE32(cmd->cmd.extralen), 10000);
 		if(ret != LE32(cmd->cmd.extralen))
 		{
 			fprintf(stderr, "Error reading mkdir data cmd->extralen %d, ret %d\n", LE32(cmd->cmd.extralen), ret);
@@ -1496,14 +1481,14 @@ int handle_mkdir(struct usb_dev_handle *hDev, struct HostFsMkdirCmd *cmd, int cm
 			}
 		}
 
-		ret = euid_usb_bulk_write(hDev, 0x2, (char *) &resp, sizeof(resp), 10000);
+		ret = euid_usb_bulk_write(dev, 0x2, (char *) &resp, sizeof(resp), 10000);
 	}
 	while(0);
 
 	return ret;
 }
 
-int handle_getstat(struct usb_dev_handle *hDev, struct HostFsGetstatCmd *cmd, int cmdlen)
+int handle_getstat(libusb_device_handle *dev, struct HostFsGetstatCmd *cmd, int cmdlen)
 {
 	struct HostFsGetstatResp resp;
 	SceIoStat st;
@@ -1533,7 +1518,7 @@ int handle_getstat(struct usb_dev_handle *hDev, struct HostFsGetstatCmd *cmd, in
 
 		/* TODO: Should check that length is within a valid range */
 
-		ret = euid_usb_bulk_read(hDev, 0x81, path, LE32(cmd->cmd.extralen), 10000);
+		ret = euid_usb_bulk_read(dev, 0x81, path, LE32(cmd->cmd.extralen), 10000);
 		if(ret != LE32(cmd->cmd.extralen))
 		{
 			fprintf(stderr, "Error reading getstat data cmd->extralen %d, ret %d\n", LE32(cmd->cmd.extralen), ret);
@@ -1550,7 +1535,7 @@ int handle_getstat(struct usb_dev_handle *hDev, struct HostFsGetstatCmd *cmd, in
 			}
 		}
 
-		ret = euid_usb_bulk_write(hDev, 0x2, (char *) &resp, sizeof(resp), 10000);
+		ret = euid_usb_bulk_write(dev, 0x2, (char *) &resp, sizeof(resp), 10000);
 		if(ret < 0)
 		{
 			fprintf(stderr, "Error writing getstat response (%d)\n", ret);
@@ -1559,7 +1544,7 @@ int handle_getstat(struct usb_dev_handle *hDev, struct HostFsGetstatCmd *cmd, in
 
 		if(LE32(resp.cmd.extralen) > 0)
 		{
-			ret = euid_usb_bulk_write(hDev, 0x2, (char *) &st, sizeof(st), 10000);
+			ret = euid_usb_bulk_write(dev, 0x2, (char *) &st, sizeof(st), 10000);
 		}
 	}
 	while(0);
@@ -1655,7 +1640,7 @@ int psp_chstat(const char *path, struct HostFsChstatCmd *cmd)
 	return 0;
 }
 
-int handle_chstat(struct usb_dev_handle *hDev, struct HostFsChstatCmd *cmd, int cmdlen)
+int handle_chstat(libusb_device_handle *dev, struct HostFsChstatCmd *cmd, int cmdlen)
 {
 	struct HostFsChstatResp resp;
 	int  ret = -1;
@@ -1683,7 +1668,7 @@ int handle_chstat(struct usb_dev_handle *hDev, struct HostFsChstatCmd *cmd, int 
 
 		/* TODO: Should check that length is within a valid range */
 
-		ret = euid_usb_bulk_read(hDev, 0x81, path, LE32(cmd->cmd.extralen), 10000);
+		ret = euid_usb_bulk_read(dev, 0x81, path, LE32(cmd->cmd.extralen), 10000);
 		if(ret != LE32(cmd->cmd.extralen))
 		{
 			fprintf(stderr, "Error reading chstat data cmd->extralen %d, ret %d\n", LE32(cmd->cmd.extralen), ret);
@@ -1696,14 +1681,14 @@ int handle_chstat(struct usb_dev_handle *hDev, struct HostFsChstatCmd *cmd, int 
 			resp.res = LE32(psp_chstat(fullpath, cmd));
 		}
 
-		ret = euid_usb_bulk_write(hDev, 0x2, (char *) &resp, sizeof(resp), 10000);
+		ret = euid_usb_bulk_write(dev, 0x2, (char *) &resp, sizeof(resp), 10000);
 	}
 	while(0);
 
 	return ret;
 }
 
-int handle_rename(struct usb_dev_handle *hDev, struct HostFsRenameCmd *cmd, int cmdlen)
+int handle_rename(libusb_device_handle *dev, struct HostFsRenameCmd *cmd, int cmdlen)
 {
 	struct HostFsRenameResp resp;
 	int  ret = -1;
@@ -1736,7 +1721,7 @@ int handle_rename(struct usb_dev_handle *hDev, struct HostFsRenameCmd *cmd, int 
 		/* TODO: Should check that length is within a valid range */
 
 		memset(path, 0, sizeof(path));
-		ret = euid_usb_bulk_read(hDev, 0x81, path, LE32(cmd->cmd.extralen), 10000);
+		ret = euid_usb_bulk_read(dev, 0x81, path, LE32(cmd->cmd.extralen), 10000);
 		if(ret != LE32(cmd->cmd.extralen))
 		{
 			fprintf(stderr, "Error reading rename data cmd->extralen %d, ret %d\n", LE32(cmd->cmd.extralen), ret);
@@ -1779,14 +1764,14 @@ int handle_rename(struct usb_dev_handle *hDev, struct HostFsRenameCmd *cmd, int 
 			}
 		}
 
-		ret = euid_usb_bulk_write(hDev, 0x2, (char *) &resp, sizeof(resp), 10000);
+		ret = euid_usb_bulk_write(dev, 0x2, (char *) &resp, sizeof(resp), 10000);
 	}
 	while(0);
 
 	return ret;
 }
 
-int handle_chdir(struct usb_dev_handle *hDev, struct HostFsChdirCmd *cmd, int cmdlen)
+int handle_chdir(libusb_device_handle *dev, struct HostFsChdirCmd *cmd, int cmdlen)
 {
 	struct HostFsChdirResp resp;
 	int  ret = -1;
@@ -1814,7 +1799,7 @@ int handle_chdir(struct usb_dev_handle *hDev, struct HostFsChdirCmd *cmd, int cm
 
 		/* TODO: Should check that length is within a valid range */
 
-		ret = euid_usb_bulk_read(hDev, 0x81, path, LE32(cmd->cmd.extralen), 10000);
+		ret = euid_usb_bulk_read(dev, 0x81, path, LE32(cmd->cmd.extralen), 10000);
 		if(ret != LE32(cmd->cmd.extralen))
 		{
 			fprintf(stderr, "Error reading chdir data cmd->extralen %d, ret %d\n", LE32(cmd->cmd.extralen), ret);
@@ -1830,14 +1815,14 @@ int handle_chdir(struct usb_dev_handle *hDev, struct HostFsChdirCmd *cmd, int cm
 			resp.res = 0;
 		}
 
-		ret = euid_usb_bulk_write(hDev, 0x2, (char *) &resp, sizeof(resp), 10000);
+		ret = euid_usb_bulk_write(dev, 0x2, (char *) &resp, sizeof(resp), 10000);
 	}
 	while(0);
 
 	return ret;
 }
 
-int handle_ioctl(struct usb_dev_handle *hDev, struct HostFsIoctlCmd *cmd, int cmdlen)
+int handle_ioctl(libusb_device_handle *dev, struct HostFsIoctlCmd *cmd, int cmdlen)
 {
 	static char inbuf[64*1024];
 	static char outbuf[64*1024];
@@ -1863,7 +1848,7 @@ int handle_ioctl(struct usb_dev_handle *hDev, struct HostFsIoctlCmd *cmd, int cm
 		{
 			/* TODO: Should check that length is within a valid range */
 
-			ret = euid_usb_bulk_read(hDev, 0x81, inbuf, inlen, 10000);
+			ret = euid_usb_bulk_read(dev, 0x81, inbuf, inlen, 10000);
 			if(ret != inlen)
 			{
 				fprintf(stderr, "Error reading ioctl data cmd->extralen %d, ret %d\n", inlen, ret);
@@ -1873,7 +1858,7 @@ int handle_ioctl(struct usb_dev_handle *hDev, struct HostFsIoctlCmd *cmd, int cm
 
 		V_PRINTF(2, "Ioctl command fid %d, cmdno %d, inlen %d\n", LE32(cmd->fid), LE32(cmd->cmdno), inlen);
 
-		ret = euid_usb_bulk_write(hDev, 0x2, (char *) &resp, sizeof(resp), 10000);
+		ret = euid_usb_bulk_write(dev, 0x2, (char *) &resp, sizeof(resp), 10000);
 		if(ret < 0)
 		{
 			fprintf(stderr, "Error writing ioctl response (%d)\n", ret);
@@ -1882,7 +1867,7 @@ int handle_ioctl(struct usb_dev_handle *hDev, struct HostFsIoctlCmd *cmd, int cm
 
 		if(LE32(resp.cmd.extralen) > 0)
 		{
-			ret = euid_usb_bulk_write(hDev, 0x2, (char *) outbuf, LE32(resp.cmd.extralen), 10000);
+			ret = euid_usb_bulk_write(dev, 0x2, (char *) outbuf, LE32(resp.cmd.extralen), 10000);
 		}
 	}
 	while(0);
@@ -1949,7 +1934,7 @@ int get_drive_info(struct DevctlGetInfo *info, unsigned int drive)
 	return ret;
 }
 
-int handle_devctl(struct usb_dev_handle *hDev, struct HostFsDevctlCmd *cmd, int cmdlen)
+int handle_devctl(libusb_device_handle *dev, struct HostFsDevctlCmd *cmd, int cmdlen)
 {
 	static char inbuf[64*1024];
 	static char outbuf[64*1024];
@@ -1976,7 +1961,7 @@ int handle_devctl(struct usb_dev_handle *hDev, struct HostFsDevctlCmd *cmd, int 
 		{
 			/* TODO: Should check that length is within a valid range */
 
-			ret = euid_usb_bulk_read(hDev, 0x81, inbuf, inlen, 10000);
+			ret = euid_usb_bulk_read(dev, 0x81, inbuf, inlen, 10000);
 			if(ret != inlen)
 			{
 				fprintf(stderr, "Error reading devctl data cmd->extralen %d, ret %d\n", inlen, ret);
@@ -1998,7 +1983,7 @@ int handle_devctl(struct usb_dev_handle *hDev, struct HostFsDevctlCmd *cmd, int 
 			default: break;
 		};
 
-		ret = euid_usb_bulk_write(hDev, 0x2, (char *) &resp, sizeof(resp), 10000);
+		ret = euid_usb_bulk_write(dev, 0x2, (char *) &resp, sizeof(resp), 10000);
 		if(ret < 0)
 		{
 			fprintf(stderr, "Error writing devctl response (%d)\n", ret);
@@ -2007,7 +1992,7 @@ int handle_devctl(struct usb_dev_handle *hDev, struct HostFsDevctlCmd *cmd, int 
 
 		if(LE32(resp.cmd.extralen) > 0)
 		{
-			ret = euid_usb_bulk_write(hDev, 0x2, (char *) outbuf, LE32(resp.cmd.extralen), 10000);
+			ret = euid_usb_bulk_write(dev, 0x2, (char *) outbuf, LE32(resp.cmd.extralen), 10000);
 		}
 	}
 	while(0);
@@ -2015,40 +2000,34 @@ int handle_devctl(struct usb_dev_handle *hDev, struct HostFsDevctlCmd *cmd, int 
 	return ret;
 }
 
-usb_dev_handle *wait_for_device(void)
+libusb_device_handle *wait_for_device(void)
 {
-	usb_dev_handle *hDev = NULL;
+	libusb_device **devs;
+	libusb_device_handle *usbdev = NULL;
 
-	while(hDev == NULL)
+	fprintf(stderr, "waiting for device...\n");
+
+	while(!usbdev)
 	{
-		usb_find_busses();
-		usb_find_devices();
+		ssize_t devcnt = libusb_get_device_list(usbctx, &devs);
 
-		struct usb_bus * busses = usb_get_busses();
-
-		if (!busses)
+		for (ssize_t i = 0; i < devcnt; i++)
 		{
-			fprintf(stderr, "no busses found\n");
-		}
-		else
-		{
-			hDev = open_device(busses);
-			if(hDev)
-			{
-				fprintf(stderr, "Connected to device\n");
-				break;
-			}
-		
-			if (!hDev)
-			{
-				fprintf(stderr, "waiting for device...\n");
-			}
-
-			hDev = open_device(usb_get_busses());
-			if(hDev)
-			{
-				fprintf(stderr, "Connected to device\n");
-				break;
+			struct libusb_device_descriptor desc;
+			int r = libusb_get_device_descriptor(devs[i], &desc);
+			if (!r) {
+				if (desc.idVendor == SONY_VID && desc.idProduct == g_pid)
+				{
+					printf("Found Sony PSP device (%04x:%04x) at bus: %d device: %d\n",
+						desc.idVendor, desc.idProduct,
+						libusb_get_bus_number(devs[i]), libusb_get_device_address(devs[i]));
+					usbdev = open_device(devs[i]);
+					if (usbdev)
+					{
+						fprintf(stderr, "Connected to device\n");
+						return usbdev;
+					}
+				}
 			}
 		}
 
@@ -2056,7 +2035,7 @@ usb_dev_handle *wait_for_device(void)
 		sleep(1);
 	}
 
-	return hDev;
+	return NULL;
 }
 
 int init_hostfs(void)
@@ -2108,92 +2087,92 @@ void do_hostfs(struct HostFsCmd *cmd, int readlen)
 
 	switch(LE32(cmd->command))
 	{
-		case HOSTFS_CMD_HELLO: if(handle_hello(g_hDev) < 0)
+		case HOSTFS_CMD_HELLO: if(handle_hello(usbhdr) < 0)
 							   {
 								   fprintf(stderr, "Error sending hello response\n");
 							   }
 							   break;
-		case HOSTFS_CMD_OPEN:  if(handle_open(g_hDev, (struct HostFsOpenCmd *) cmd, readlen) < 0)
+		case HOSTFS_CMD_OPEN:  if(handle_open(usbhdr, (struct HostFsOpenCmd *) cmd, readlen) < 0)
 							   {
 								   fprintf(stderr, "Error in open command\n");
 							   }
 							   break;
-		case HOSTFS_CMD_CLOSE: if(handle_close(g_hDev, (struct HostFsCloseCmd *) cmd, readlen) < 0)
+		case HOSTFS_CMD_CLOSE: if(handle_close(usbhdr, (struct HostFsCloseCmd *) cmd, readlen) < 0)
 							   {
 								   fprintf(stderr, "Error in close command\n");
 							   }
 							   break;
-		case HOSTFS_CMD_WRITE: if(handle_write(g_hDev, (struct HostFsWriteCmd *) cmd, readlen) < 0)
+		case HOSTFS_CMD_WRITE: if(handle_write(usbhdr, (struct HostFsWriteCmd *) cmd, readlen) < 0)
 							   {
 								   fprintf(stderr, "Error in write command\n");
 							   }
 							   break;
-		case HOSTFS_CMD_READ:  if(handle_read(g_hDev, (struct HostFsReadCmd *) cmd, readlen) < 0)
+		case HOSTFS_CMD_READ:  if(handle_read(usbhdr, (struct HostFsReadCmd *) cmd, readlen) < 0)
 							   {
 								   fprintf(stderr, "Error in read command\n");
 							   }
 							   break;
-		case HOSTFS_CMD_LSEEK: if(handle_lseek(g_hDev, (struct HostFsLseekCmd *) cmd, readlen) < 0)
+		case HOSTFS_CMD_LSEEK: if(handle_lseek(usbhdr, (struct HostFsLseekCmd *) cmd, readlen) < 0)
 							   {
 								   fprintf(stderr, "Error in lseek command\n");
 							   }
 							   break;
-		case HOSTFS_CMD_DOPEN: if(handle_dopen(g_hDev, (struct HostFsDopenCmd *) cmd, readlen) < 0)
+		case HOSTFS_CMD_DOPEN: if(handle_dopen(usbhdr, (struct HostFsDopenCmd *) cmd, readlen) < 0)
 							   {
 								   fprintf(stderr, "Error in dopen command\n");
 							   }
 							   break;
-		case HOSTFS_CMD_DCLOSE: if(handle_dclose(g_hDev, (struct HostFsDcloseCmd *) cmd, readlen) < 0)
+		case HOSTFS_CMD_DCLOSE: if(handle_dclose(usbhdr, (struct HostFsDcloseCmd *) cmd, readlen) < 0)
 								{
 									fprintf(stderr, "Error in dclose command\n");
 								}
 								break;
-		case HOSTFS_CMD_DREAD: if(handle_dread(g_hDev, (struct HostFsDreadCmd *) cmd, readlen) < 0)
+		case HOSTFS_CMD_DREAD: if(handle_dread(usbhdr, (struct HostFsDreadCmd *) cmd, readlen) < 0)
 							   {
 									fprintf(stderr, "Error in dread command\n");
 							   }
 							   break;
-		case HOSTFS_CMD_REMOVE: if(handle_remove(g_hDev, (struct HostFsRemoveCmd *) cmd, readlen) < 0)
+		case HOSTFS_CMD_REMOVE: if(handle_remove(usbhdr, (struct HostFsRemoveCmd *) cmd, readlen) < 0)
 								{
 									fprintf(stderr, "Error in remove command\n");
 								}
 								break;
-		case HOSTFS_CMD_RMDIR: if(handle_rmdir(g_hDev, (struct HostFsRmdirCmd *) cmd, readlen) < 0)
+		case HOSTFS_CMD_RMDIR: if(handle_rmdir(usbhdr, (struct HostFsRmdirCmd *) cmd, readlen) < 0)
 								{
 									fprintf(stderr, "Error in rmdir command\n");
 								}
 								break;
-		case HOSTFS_CMD_MKDIR: if(handle_mkdir(g_hDev, (struct HostFsMkdirCmd *) cmd, readlen) < 0)
+		case HOSTFS_CMD_MKDIR: if(handle_mkdir(usbhdr, (struct HostFsMkdirCmd *) cmd, readlen) < 0)
 								{
 									fprintf(stderr, "Error in mkdir command\n");
 								}
 								break;
-		case HOSTFS_CMD_CHDIR: if(handle_chdir(g_hDev, (struct HostFsChdirCmd *) cmd, readlen) < 0)
+		case HOSTFS_CMD_CHDIR: if(handle_chdir(usbhdr, (struct HostFsChdirCmd *) cmd, readlen) < 0)
 								{
 									fprintf(stderr, "Error in chdir command\n");
 								}
 								break;
-		case HOSTFS_CMD_RENAME: if(handle_rename(g_hDev, (struct HostFsRenameCmd *) cmd, readlen) < 0)
+		case HOSTFS_CMD_RENAME: if(handle_rename(usbhdr, (struct HostFsRenameCmd *) cmd, readlen) < 0)
 								{
 									fprintf(stderr, "Error in rename command\n");
 								}
 								break;
-		case HOSTFS_CMD_GETSTAT:if(handle_getstat(g_hDev, (struct HostFsGetstatCmd *) cmd, readlen) < 0)
+		case HOSTFS_CMD_GETSTAT:if(handle_getstat(usbhdr, (struct HostFsGetstatCmd *) cmd, readlen) < 0)
 								{
 									fprintf(stderr, "Error in getstat command\n");
 								}
 								break;
-		case HOSTFS_CMD_CHSTAT: if(handle_chstat(g_hDev, (struct HostFsChstatCmd *) cmd, readlen) < 0)
+		case HOSTFS_CMD_CHSTAT: if(handle_chstat(usbhdr, (struct HostFsChstatCmd *) cmd, readlen) < 0)
 								{
 									fprintf(stderr, "Error in chstat command\n");
 								}
 								break;
-		case HOSTFS_CMD_IOCTL: if(handle_ioctl(g_hDev, (struct HostFsIoctlCmd *) cmd, readlen) < 0)
+		case HOSTFS_CMD_IOCTL: if(handle_ioctl(usbhdr, (struct HostFsIoctlCmd *) cmd, readlen) < 0)
 							   {
 								   fprintf(stderr, "Error in ioctl command\n");
 							   }
 							   break;
-		case HOSTFS_CMD_DEVCTL: if(handle_devctl(g_hDev, (struct HostFsDevctlCmd *) cmd, readlen) < 0)
+		case HOSTFS_CMD_DEVCTL: if(handle_devctl(usbhdr, (struct HostFsDevctlCmd *) cmd, readlen) < 0)
 							   {
 								   fprintf(stderr, "Error in devctl command\n");
 							   }
@@ -2245,7 +2224,7 @@ void do_bulk(struct BulkCommand *cmd, int readlen)
 		int readsize;
 
 		readsize = (len - read) > HOSTFS_MAX_BLOCK ? HOSTFS_MAX_BLOCK : (len - read);
-		ret = euid_usb_bulk_read(g_hDev, 0x81, &block[read], readsize, 10000);
+		ret = euid_usb_bulk_read(usbhdr, 0x81, &block[read], readsize, 10000);
 		if(ret != readsize)
 		{
 			fprintf(stderr, "Error reading write data readsize %d, ret %d\n", readsize, ret);
@@ -2272,19 +2251,19 @@ int start_hostfs(void)
 	{
 		init_hostfs();
 
-		g_hDev = wait_for_device();
+		usbhdr = wait_for_device();
 
-		if(g_hDev)
+		if(usbhdr)
 		{
 			uint32_t magic;
 
 			magic = LE32(HOSTFS_MAGIC);
 
-			if(euid_usb_bulk_write(g_hDev, 0x2, (char *) &magic, sizeof(magic), 1000) == sizeof(magic))
+			if(euid_usb_bulk_write(usbhdr, 0x2, (char *) &magic, sizeof(magic), 1000) == sizeof(magic))
 			{
 				while(1)
 				{
-					readlen = euid_usb_bulk_read(g_hDev, 0x81, (char*) data, 512, g_timeout);
+					readlen = euid_usb_bulk_read(usbhdr, 0x81, (char*) data, 512, g_timeout);
 					if(readlen == 0)
 					{
 						fprintf(stderr, "Read cancelled (remote disconnected)\n");
@@ -2342,8 +2321,8 @@ int start_hostfs(void)
 				}
 			}
 
-			close_device(g_hDev);
-			g_hDev = NULL;
+			close_device(usbhdr);
+			usbhdr = NULL;
 		}
 
 		close_hostfs();
@@ -2482,12 +2461,12 @@ int exit_app(void)
 {
 	printf("Exiting\n");
 	shutdown_socket();
-	if(g_hDev)
+	if(usbhdr)
 	{
 		/* Nuke the connection */
 		seteuid(0);
 		setegid(0);
-		close_device(g_hDev);
+		close_device(usbhdr);
 	}
 	exit(1);
 
@@ -3105,10 +3084,10 @@ void *async_thread(void *arg)
 								}
 							}
 
-							if(g_hDev)
+							if(usbhdr)
 							{
 								cmd->channel = LE32(i);
-								euid_usb_bulk_write(g_hDev, 0x3, buf, readbytes+sizeof(struct AsyncCommand), 10000);
+								euid_usb_bulk_write(usbhdr, 0x3, buf, readbytes+sizeof(struct AsyncCommand), 10000);
 							}
 						}
 						else
@@ -3141,7 +3120,11 @@ int main(int argc, char **argv)
 	if(parse_args(argc, argv))
 	{
 		pthread_t thid;
-		usb_init();
+		int usberr = libusb_init(&usbctx);
+		if (usberr) {
+			printf("USB initialization failed: %d\n", usberr);
+			return 1;
+		}
 
 		signal(SIGINT, signal_handler);
 		signal(SIGTERM, signal_handler);
@@ -3183,6 +3166,7 @@ int main(int argc, char **argv)
 
 		pthread_create(&thid, NULL, async_thread, NULL);
 		start_hostfs();
+		libusb_exit(usbctx);
 	}
 	else
 	{
