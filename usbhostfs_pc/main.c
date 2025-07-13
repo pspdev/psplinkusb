@@ -2269,7 +2269,7 @@ int start_hostfs(void)
 						fprintf(stderr, "Read cancelled (remote disconnected)\n");
 						break;
 					}
-					else if(readlen == -ETIMEDOUT)
+					else if(readlen == LIBUSB_ERROR_TIMEOUT)
 					{
 						continue;
 					}
