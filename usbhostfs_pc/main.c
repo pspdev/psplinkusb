@@ -2031,6 +2031,8 @@ libusb_device_handle *wait_for_device(void)
 			}
 		}
 
+		libusb_free_device_list(devs, 1);
+
 		/* Sleep for one second */
 		sleep(1);
 	}
