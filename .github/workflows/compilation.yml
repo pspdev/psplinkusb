@@ -15,7 +15,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        apk add build-base linux-headers readline-dev libusb-compat-dev
+        apk add build-base linux-headers readline-dev libusb-dev
 
     - name: Compile project
       run: |
@@ -40,7 +40,7 @@ jobs:
       - name: Set up Cygwin
         uses: egor-tensin/setup-cygwin@v4
         with:
-          packages: gcc-core gcc-g++ make libreadline7 libreadline-devel libusb0 libusb-devel libncursesw10
+          packages: gcc-core gcc-g++ make libreadline8 libreadline-devel libusb1.0 libusb1.0-devel libncursesw10
 
       - name: Compile project
         run: |
@@ -52,8 +52,8 @@ jobs:
           cp C:\tools\cygwin\bin\cygwin1.dll build
           cp C:\tools\cygwin\bin\cygstdc++-6.dll build
           cp C:\tools\cygwin\bin\cyggcc_s-seh-1.dll build
-          cp C:\tools\cygwin\bin\cygreadline7.dll build
-          cp C:\tools\cygwin\bin\cygusb0.dll build
+          cp C:\tools\cygwin\bin\cygreadline8.dll build
+          cp C:\tools\cygwin\bin\cygusb-1.0.dll build
           cp C:\tools\cygwin\bin\cygncursesw-10.dll build
 
       - name: Upload artifacts
