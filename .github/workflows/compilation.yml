@@ -40,7 +40,7 @@ jobs:
       - name: Set up Cygwin
         uses: egor-tensin/setup-cygwin@v4
         with:
-          packages: gcc-core gcc-g++ make libreadline8 libreadline-devel libusb1.0 libusb1.0-devel libncursesw10
+          packages: gcc-core gcc-g++ make libreadline8 libreadline-devel libusb1.0 libusb1.0-devel
 
       - name: Compile project
         run: |
@@ -49,12 +49,15 @@ jobs:
           mkdir build
           cp usbhostfs_pc\usbhostfs_pc.exe build
           cp pspsh\pspsh.exe build
-          cp C:\tools\cygwin\bin\cygwin1.dll build
-          cp C:\tools\cygwin\bin\cygstdc++-6.dll build
-          cp C:\tools\cygwin\bin\cyggcc_s-seh-1.dll build
-          cp C:\tools\cygwin\bin\cygreadline8.dll build
-          cp C:\tools\cygwin\bin\cygusb-1.0.dll build
-          cp C:\tools\cygwin\bin\cygncursesw-10.dll build
+
+      - name: Collect and copy Cygwin DLL dependencies
+        shell: C:\tools\cygwin\bin\bash.exe --norc -eo pipefail -o igncr '{0}'
+        run: |
+          for exe in build/usbhostfs_pc.exe build/pspsh.exe; do
+            cygcheck "$exe" | grep -E '\.dll$' | grep "\\\\cyg" | while read -r dll; do
+              [[ -f "$dll" ]] && cp "$dll" build/
+            done
+          done
 
       - name: Upload artifacts
         if: ${{ success() }}
