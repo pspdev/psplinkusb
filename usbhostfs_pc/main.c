@@ -58,6 +58,8 @@
 #define MAX_TOKENS 256
 
 #define BASE_PORT 10000
+#define USB_CONFIG_NUM 1
+#define USB_IFACE_NUM  0
 
 #ifdef __CYGWIN__
 #define USB_TIMEOUT 1000
@@ -272,14 +274,25 @@ libusb_device_handle *open_device(libusb_device *usbdev)
 		return NULL;
 	}
 	if (!r) {
-		r = libusb_set_configuration(ret, 1);
+		int cfgn;
+		r = libusb_get_configuration(ret, &cfgn);
 		if (r) {
 			seteuid(getuid());
 			setegid(getgid());
-			fprintf(stderr, "Failed at selecting USB configuration: %d\n", r);
+			fprintf(stderr, "Failed at reading selected USB configuration: %d\n", r);
 			return NULL;
 		}
-		r = libusb_claim_interface(ret, 0);
+		if (cfgn != USB_CONFIG_NUM)
+		{
+			r = libusb_set_configuration(ret, 1);
+			if (r) {
+				seteuid(getuid());
+				setegid(getgid());
+				fprintf(stderr, "Failed at selecting USB configuration: %d\n", r);
+				return NULL;
+			}
+		}
+		r = libusb_claim_interface(ret, USB_IFACE_NUM);
 		if (r) {
 			seteuid(getuid());
 			setegid(getgid());
