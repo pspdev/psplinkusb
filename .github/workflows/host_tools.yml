@@ -56,7 +56,7 @@ jobs:
             [ubuntu, bash], 
             [fedora, bash],
         ]
-      fail-fast: false ver
+      fail-fast: false
     steps:
     - uses: actions/checkout@v2
 
