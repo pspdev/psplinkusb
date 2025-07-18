@@ -35,7 +35,7 @@ jobs:
       if: matrix.os[0] == 'ubuntu-latest'
       run: |
         sudo apt-get update
-        sudo apt-get -y install libusb-1.0-0-dev gcc
+        sudo apt-get -y install libusb-1.0-0-dev libusb-dev gcc
 
     - name: Install macOS packages
       if: startsWith(matrix.os[0], 'macos')
