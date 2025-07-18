@@ -15,7 +15,7 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <inttypes.h>
-#include <libusb-1.0/libusb.h>
+#include <libusb.h>
 #include <limits.h>
 #include <fcntl.h>
 #include <usbhostfs.h>
