@@ -56,7 +56,7 @@ jobs:
             [ubuntu, bash], 
             [fedora, bash],
         ]
-      fail-fast: false
+      fail-fast: false ver
     steps:
     - uses: actions/checkout@v2
 
@@ -64,7 +64,7 @@ jobs:
       if: matrix.os[0] == 'ubuntu'
       run: |
         apt-get -y update
-        DEBIAN_FRONTEND="noninteractive" TZ="Europe/London" apt-get -y install libusb-1.0-0-dev libusb-dev gcc make pkgconfig
+        DEBIAN_FRONTEND="noninteractive" TZ="Europe/London" apt-get -y install libusb-1.0-0-dev libusb-dev gcc make pkg-config
     
     - name: Install dependencies Fedora
       if: matrix.os[0] == 'fedora'
