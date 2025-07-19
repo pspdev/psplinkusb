@@ -1,1 +1,4 @@
+# udev rules for the Sony PSP device
+# This file is usually installed to /etc/udev/rules.d
+
 SUBSYSTEM=="usb", ATTR{idVendor}=="054c", ATTR{idProduct}=="01c9", SYMLINK+="psp", MODE="0666"
