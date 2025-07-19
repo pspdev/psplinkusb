@@ -27,6 +27,7 @@ $(OUTPUT): $(OBJS)
 install: $(OUTPUT)
 	@echo "Installing $(OUTPUT)..."
 	@if ( test $(PREFIX) ); then { mkdir -p $(PREFIX)/bin && cp $(OUTPUT) $(PREFIX)/bin; } else { echo "Error: psp-config not found!"; exit 1; } fi
+	@if ( test $(PREFIX) ); then { mkdir -p $(PREFIX)/share/psplinkusb && cp 50-psplink.rules $(PREFIX)/share/psplinkusb; } else { echo "Error: psp-config not found!"; exit 1; } fi
 	@echo "Done!"
 
 clean:
