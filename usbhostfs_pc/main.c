@@ -35,15 +35,10 @@
 #include <netdb.h>
 
 #ifdef __CYGWIN__
-#include <sys/vfs.h>
-#define NO_UID_CHECK
-/* Define out set* and get* calls for cygwin as they are unnecessary and can cause issues */
-#define seteuid(x)
-#define setegid(x)
-#define getuid()
-#define getgid()
+  #include <sys/vfs.h>
+  #define NO_UID_CHECK
 #else
-#include <sys/statvfs.h>
+  #include <sys/statvfs.h>
 #endif
 
 #ifdef READLINE_SHELL
@@ -219,13 +214,9 @@ int euid_usb_bulk_write(libusb_device_handle *dev, int ep, char *bytes, int size
 	V_PRINTF(2, "Bulk Write dev %p, ep 0x%x, bytes %p, size %d, timeout %d\n",
 			dev, ep, bytes, size, timeout);
 
-	seteuid(0);
-	setegid(0);
 	int ret = libusb_bulk_transfer(dev, ep, (unsigned char*)bytes, size, &wrbytes, timeout);
 	if (!ret)
 		ret = wrbytes;
-	seteuid(getuid());
-	setegid(getgid());
 
 	V_PRINTF(2, "Bulk Write returned %d\n", ret);
 
@@ -239,89 +230,93 @@ int euid_usb_bulk_read(libusb_device_handle *dev, int ep, char *bytes, int size,
 
 	V_PRINTF(2, "Bulk Read dev %p, ep 0x%x, bytes %p, size %d, timeout %d\n",
 			dev, ep, bytes, size, timeout);
-	seteuid(0);
-	setegid(0);
 	int ret = libusb_bulk_transfer(usbhdr, ep, (unsigned char*)bytes, size, &rdbytes, timeout);
 	if (!ret)
 		ret = rdbytes;
-	seteuid(getuid());
-	setegid(getgid());
 
 	V_PRINTF(2, "Bulk Read returned %d\n", ret);
 
 	return ret;
 }
 
+int configure_usb(libusb_device_handle *devh) {
+	int cfgn;
+	int r = libusb_get_configuration(devh, &cfgn);
+	if (r) {
+		fprintf(stderr, "Failed at reading selected USB configuration: %d\n", r);
+		return r;
+	}
+	if (cfgn != USB_CONFIG_NUM)
+	{
+		r = libusb_set_configuration(devh, 1);
+		if (r) {
+			fprintf(stderr, "Failed at selecting USB configuration: %d\n", r);
+			return r;
+		}
+	}
+	r = libusb_claim_interface(devh, USB_IFACE_NUM);
+	if (r) {
+		fprintf(stderr, "Failed at claiming USB interface: %d\n", r);
+		return r;
+	}
+
+	return 0;
+}
+
 libusb_device_handle *open_device(libusb_device *usbdev)
 {
 	libusb_device_handle *ret = NULL;
 
-	seteuid(0);
-	setegid(0);
-
+	int escalated = 0;
 	int r = libusb_open(usbdev, &ret);
 	if (r == LIBUSB_ERROR_ACCESS) {
-		seteuid(getuid());
-		setegid(getgid());
-
-		fprintf(stderr, "Permission error while opening the USB device.\n");
-
-		#ifndef NO_UID_CHECK
-		if (geteuid())
-			fprintf(stderr, "Fix device permissions or run as root.\n");
-		#endif
-
-		return NULL;
-	}
-	if (!r) {
-		int cfgn;
-		r = libusb_get_configuration(ret, &cfgn);
-		if (r) {
-			seteuid(getuid());
-			setegid(getgid());
-			fprintf(stderr, "Failed at reading selected USB configuration: %d\n", r);
+		/* We do not seem to have permissions, try elevating privileges (if sbit is set) */
+		#ifdef NO_UID_CHECK
+			fprintf(stderr, "Permission error while opening the USB device.\n");
 			return NULL;
-		}
-		if (cfgn != USB_CONFIG_NUM)
-		{
-			r = libusb_set_configuration(ret, 1);
-			if (r) {
+		#else
+			if (seteuid(0) < 0 || setegid(0) < 0) {
+				fprintf(stderr, "Permission error while opening the USB device.\n");
+				fprintf(stderr, "  You might need to enable USB permissions for this program.\n");
+				fprintf(stderr, "  On Linux you mgiht need to install a udev config file (50-psplink.rules)\n");
+				fprintf(stderr, "  You can also set the `setuid` bit on the binary alternatively\n");
+
 				seteuid(getuid());
 				setegid(getgid());
-				fprintf(stderr, "Failed at selecting USB configuration: %d\n", r);
 				return NULL;
 			}
-		}
-		r = libusb_claim_interface(ret, USB_IFACE_NUM);
-		if (r) {
-			seteuid(getuid());
-			setegid(getgid());
-			fprintf(stderr, "Failed at claiming USB interface: %d\n", r);
-			return NULL;
-		}
+			escalated = 1;
+		#endif
 
-		seteuid(getuid());
-		setegid(getgid());
-		return ret;
+		/* Try again, see if the sbit helps. */
+		r = libusb_open(usbdev, &ret);
+		if (r == LIBUSB_ERROR_ACCESS) {
+			fprintf(stderr, "Permission error while opening the USB device.\n");
+			ret = NULL;
+		}
+	}
+	if (!r) {
+		if (configure_usb(ret))
+			ret = NULL;
 	}
 
-	seteuid(getuid());
-	setegid(getgid());
-	return NULL;
+	#ifndef NO_UID_CHECK
+		if (escalated) {
+			seteuid(getuid());
+			setegid(getgid());
+		}
+	#endif
+	return ret;
 }
 
 void close_device(libusb_device_handle *dev)
 {
-	seteuid(0);
-	setegid(0);
 	if(dev)
 	{
 		libusb_release_interface(dev, 0);
 		libusb_reset_device(dev);
 		libusb_close(dev);
 	}
-	seteuid(getuid());
-	setegid(getgid());
 }
 
 int gen_path(char *path, int dir)
@@ -2479,8 +2474,6 @@ int exit_app(void)
 	if(usbhdr)
 	{
 		/* Nuke the connection */
-		seteuid(0);
-		setegid(0);
 		close_device(usbhdr);
 	}
 	exit(1);
