@@ -37,12 +37,6 @@ jobs:
         sudo apt-get update
         sudo apt-get -y install libusb-1.0-0-dev libusb-dev gcc
 
-    - name: Install macOS packages
-      if: startsWith(matrix.os[0], 'macos')
-      run: |
-        brew update
-        brew install libusb gcc
-
     - name: Compile tools
       run: |
         make --quiet -j $PROC_NR -C usbhostfs_pc
