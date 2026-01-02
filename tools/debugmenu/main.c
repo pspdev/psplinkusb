@@ -54,7 +54,7 @@ int opt_count = sizeof(options)/sizeof(struct MenuOption);
 
 #define TRIGGER (PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER | PSP_CTRL_START | PSP_CTRL_SELECT)
 
-void button_callback(int curr, int last, void *arg)
+void button_callback(u32 curr, u32 last, void *arg)
 {
 	if((curr & TRIGGER) == TRIGGER)
 	{
