@@ -36,7 +36,7 @@ int threadFindContext(SceUID uid)
 	info.size = sizeof(info);
 
 	intc = pspSdkDisableInterrupts();
-	if(ThreadManForKernel_2D69D086(uid, &info) == 0)
+	if(sceKernelReferThreadDebugStatus(uid, &info) == 0)
 	{
 		found = 1;
 		if(info.thContext)
@@ -66,7 +66,7 @@ unsigned int thGetCurrentEPC(SceUID uid)
 
 	memset(&info, 0, sizeof(info));
 	info.size = sizeof(info);
-	if(ThreadManForKernel_2D69D086(uid, &info) == 0)
+	if(sceKernelReferThreadDebugStatus(uid, &info) == 0)
 	{
 		if(info.retAddr)
 		{
@@ -97,7 +97,7 @@ int psplinkGetFullThreadContext(SceUID uid, struct PsplinkContext *ctx)
 	info.size = sizeof(info);
 
 	intc = pspSdkDisableInterrupts();
-	if(ThreadManForKernel_2D69D086(uid, &info) == 0)
+	if(sceKernelReferThreadDebugStatus(uid, &info) == 0)
 	{
 		memset(ctx, 0, sizeof(struct PsplinkContext));
 		ctx->thid = uid;
