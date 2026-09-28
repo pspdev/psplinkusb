@@ -26,7 +26,7 @@ uidControlBlock* findUIDObject(SceUID uid, const char *name, const char *parent)
 	}
 	else
 	{
-		entry = SysMemForKernel_536AD5E1();
+		entry = sceKernelGetUidmanCB();
 	}
 	/*
     if(sceKernelDevkitVersion() == 0x01050001)
@@ -110,7 +110,7 @@ void printUIDList(const char *name)
 	}
 	else
 	{
-		entry = SysMemForKernel_536AD5E1();
+		entry = sceKernelGetUidmanCB();
 	}
 
 	/*
