@@ -56,11 +56,9 @@
 #define USB_CONFIG_NUM 1
 #define USB_IFACE_NUM  0
 
-#ifdef __CYGWIN__
+/* A finite timeout lets the main loop notice a PSP that went away without the read failing (a reset that
+   re-enumerates, or a wedged PSP): the re-issued read fails and we reconnect. With 0 it blocks forever. */
 #define USB_TIMEOUT 1000
-#else
-#define USB_TIMEOUT 0
-#endif
 
 #define MAX_HOSTDRIVES 8
 
@@ -297,7 +295,11 @@ libusb_device_handle *open_device(libusb_device *usbdev)
 	}
 	if (!r) {
 		if (configure_usb(ret))
+		{
+			/* Don't leak the handle, or every retry leaves another one open on the device. */
+			libusb_close(ret);
 			ret = NULL;
+		}
 	}
 
 	#ifndef NO_UID_CHECK
@@ -2033,6 +2035,7 @@ libusb_device_handle *wait_for_device(void)
 					if (usbdev)
 					{
 						fprintf(stderr, "Connected to device\n");
+						libusb_free_device_list(devs, 1);
 						return usbdev;
 					}
 				}
@@ -3020,6 +3023,12 @@ void *async_thread(void *arg)
 					if(fgets(buffer, sizeof(buffer), stdin))
 					{
 						parse_shell(buffer);
+					}
+					else
+					{
+						/* EOF (stdin is /dev/null or a closed pipe): stop selecting on it, or select
+						   reports it readable forever and this thread spins a core. */
+						FD_CLR(STDIN_FILENO, &read_save);
 					}
 #endif
 				}
