@@ -315,10 +315,12 @@ int read_string(const char **pin, char **pout, int sargc, char **sargv)
 	if(in_quote)
 	{
 		printf("Missing matching quote %c\n", in_quote);
+		return -1;
 	}
 	else if(error)
 	{
 		printf("Error in command line\n");
+		return -1;
 	}
 	else
 	{
@@ -375,7 +377,7 @@ int parse_cli(const char *in, char *out, int *argc, char **argv, int max_args, i
 				*type = REDIR_TYPE_NEW;
 			}
 
-			if(read_string(&in, &outfile, sargc, sargv) == 0)
+			if(read_string(&in, &outfile, sargc, sargv) <= 0)
 			{
 				printf("Error in redirection, no filename\n");
 				return 0;
@@ -383,7 +385,12 @@ int parse_cli(const char *in, char *out, int *argc, char **argv, int max_args, i
 		}
 		else
 		{
-			if(read_string(&in, &out, sargc, sargv) == 0)
+			int parsed = read_string(&in, &out, sargc, sargv);
+			if(parsed < 0)
+			{
+				return 0;
+			}
+			if(parsed == 0)
 			{
 				break;
 			}
@@ -395,6 +402,10 @@ int parse_cli(const char *in, char *out, int *argc, char **argv, int max_args, i
 	}
 
 	argv[*argc] = NULL;
+	if(*argc == 0)
+	{
+		return 0;
+	}
 	/* A command ends with a 1 */
 	*out++ = 1;
 
