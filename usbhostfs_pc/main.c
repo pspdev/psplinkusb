@@ -98,6 +98,81 @@ struct DirHandle  open_dirs[MAX_DIRS];
 static libusb_context *usbctx = NULL;
 static libusb_device_handle *usbhdr = NULL;
 
+/*
+ * Main thread owns opening and closing the USB handle. The async thread may
+ * submit a bulk OUT transfer concurrently with the main bulk IN loop.
+ * Only protect handle acquisition/lifetime here: locking across the 1-second
+ * main bulk read would delay interactive shell input by up to a second.
+ */
+static pthread_mutex_t g_usb_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t g_usb_idle = PTHREAD_COND_INITIALIZER;
+static unsigned int g_usb_async_inflight = 0;
+static int g_usb_reconnect_requested = 0;
+static int g_usb_async_failure = 0;
+
+static void usb_publish_handle(libusb_device_handle *dev)
+{
+	pthread_mutex_lock(&g_usb_mutex);
+	usbhdr = dev;
+	g_usb_reconnect_requested = 0;
+	g_usb_async_failure = 0;
+	pthread_mutex_unlock(&g_usb_mutex);
+}
+
+static libusb_device_handle *usb_acquire_async_handle(void)
+{
+	libusb_device_handle *dev = NULL;
+	pthread_mutex_lock(&g_usb_mutex);
+	if(usbhdr && !g_usb_reconnect_requested)
+	{
+		dev = usbhdr;
+		g_usb_async_inflight++;
+	}
+	pthread_mutex_unlock(&g_usb_mutex);
+	return dev;
+}
+
+static void usb_complete_async_transfer(int transferred, int requested)
+{
+	pthread_mutex_lock(&g_usb_mutex);
+	if(transferred != requested)
+	{
+		g_usb_reconnect_requested = 1;
+		g_usb_async_failure = 1;
+	}
+	if(--g_usb_async_inflight == 0)
+		pthread_cond_signal(&g_usb_idle);
+	pthread_mutex_unlock(&g_usb_mutex);
+}
+
+static int usb_reconnect_pending(void)
+{
+	int pending;
+	pthread_mutex_lock(&g_usb_mutex);
+	pending = g_usb_reconnect_requested;
+	pthread_mutex_unlock(&g_usb_mutex);
+	return pending;
+}
+
+/*
+ * Stop new async transfers, wait for any existing write to finish, then
+ * relinquish the handle. Never close a libusb handle still in use by the
+ * asynchronous writer. Returns whether that writer requested reconnect.
+ */
+static libusb_device_handle *usb_take_handle(int *async_reconnect)
+{
+	libusb_device_handle *dev;
+	pthread_mutex_lock(&g_usb_mutex);
+	g_usb_reconnect_requested = 1;
+	while(g_usb_async_inflight)
+		pthread_cond_wait(&g_usb_idle, &g_usb_mutex);
+	*async_reconnect = g_usb_async_failure;
+	dev = usbhdr;
+	usbhdr = NULL;
+	pthread_mutex_unlock(&g_usb_mutex);
+	return dev;
+}
+
 static int g_servsocks[MAX_ASYNC_CHANNELS];
 static int g_clientsocks[MAX_ASYNC_CHANNELS];
 static const char *g_mapfile = NULL;
@@ -266,6 +341,22 @@ int euid_usb_bulk_write(libusb_device_handle *dev, int ep, char *bytes, int size
 	int timeout)
 {
 	int wrbytes;
+
+#ifdef PSPLINKUSB_TEST_INJECT_EP3_TIMEOUT
+	/* Test-only fault injection: force one failed host->PSP shell write.
+	 * Never enabled by a normal build. Used to exercise live reconnect
+	 * without waiting for another all-night stall. */
+	if(ep == 0x3)
+	{
+		static int fail_once = 1;
+		if(fail_once)
+		{
+			fail_once = 0;
+			fprintf(stderr, "TEST ONLY: injecting endpoint 3 timeout\n");
+			return LIBUSB_ERROR_TIMEOUT;
+		}
+	}
+#endif
 
 	V_PRINTF(2, "Bulk Write dev %p, ep 0x%x, bytes %p, size %d, timeout %d\n",
 			dev, ep, bytes, size, timeout);
@@ -2321,21 +2412,28 @@ int start_hostfs(void)
 
 	while(1)
 	{
+		libusb_device_handle *dev;
+		int async_reconnect;
 		init_hostfs();
 
-		usbhdr = wait_for_device();
+		dev = wait_for_device();
+		usb_publish_handle(dev);
 
-		if(usbhdr)
+		if(dev)
 		{
 			uint32_t magic;
 
 			magic = LE32(HOSTFS_MAGIC);
 
-			if(euid_usb_bulk_write(usbhdr, 0x2, (char *) &magic, sizeof(magic), 1000) == sizeof(magic))
+			if(euid_usb_bulk_write(dev, 0x2, (char *) &magic, sizeof(magic), 1000) == sizeof(magic))
 			{
 				while(1)
 				{
-					readlen = euid_usb_bulk_read(usbhdr, 0x81, (char*) data, 512, g_timeout);
+					if(usb_reconnect_pending())
+						break;
+					readlen = euid_usb_bulk_read(dev, 0x81, (char*) data, 512, g_timeout);
+					if(usb_reconnect_pending())
+						break;
 					if(readlen == 0)
 					{
 						fprintf(stderr, "Read cancelled (remote disconnected)\n");
@@ -2351,7 +2449,7 @@ int start_hostfs(void)
 							time_t now = time(NULL);
 							if(now != (time_t)-1 && (last_trace == 0 || now - last_trace >= 30))
 							{
-								int present = usb_handle_enumerated(usbhdr);
+								int present = usb_handle_enumerated(dev);
 								trace_usb("idle bulk-IN timeout; original device enumerated=%d", present);
 								last_trace = now;
 							}
@@ -2408,9 +2506,18 @@ int start_hostfs(void)
 				}
 			}
 
-			trace_usb("closing USB device handle; reconnect requested");
-			close_device(usbhdr);
-			usbhdr = NULL;
+			dev = usb_take_handle(&async_reconnect);
+			if(async_reconnect)
+			{
+				fprintf(stderr, "Async USB transfer failed; resetting and reconnecting device\n");
+				trace_usb("recovering async endpoint with coordinated device reset");
+				close_device(dev);
+			}
+			else
+			{
+				trace_usb("closing USB device handle; reconnect requested");
+				close_device(dev);
+			}
 		}
 
 		close_hostfs();
@@ -3182,13 +3289,16 @@ void *async_thread(void *arg)
 								}
 							}
 
-							if(usbhdr)
+							libusb_device_handle *async_dev = usb_acquire_async_handle();
+							if(async_dev)
 							{
 								cmd->channel = LE32(i);
-								int sent = euid_usb_bulk_write(usbhdr, 0x3, buf,
-									readbytes+sizeof(struct AsyncCommand), 10000);
+								int requested = readbytes + (int)sizeof(struct AsyncCommand);
+								int sent = euid_usb_bulk_write(async_dev, 0x3, buf,
+									requested, 10000);
+								usb_complete_async_transfer(sent, requested);
 								trace_usb("async channel=%d: submitted %d bytes, transferred=%d",
-									i, readbytes+ (int)sizeof(struct AsyncCommand), sent);
+									i, requested, sent);
 							}
 						}
 						else

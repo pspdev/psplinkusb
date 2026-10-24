@@ -1,97 +1,99 @@
-# Issue #74: USB HostFS sleep/wake diagnosis
+# Issue #74: long-idle USB HostFS stall and recovery
 
-The long-uptime failure was reproduced on a real PSP: \`pspsh\` timed out even
-though macOS still enumerated the device and the host daemon still listened on
-its TCP ports. The host main thread was waiting for a USB bulk-IN transfer.
-macOS had entered sleep and performed repeated maintenance wake cycles.
+## Confirmed failures
 
-This **does not establish sleep as the cause**. The pre-failure PSP-side USB
-request state was not captured. See GitHub issue #74 for the original evidence.
+Twice, a physical PSP running PSPLinkUSB stopped answering `pspsh` after many
+hours. macOS still enumerated Sony USB device `054c:01c9`; the Mac host daemon
+remained alive, with normal memory usage and its TCP ports open. Thread samples
+showed its main thread polling for USB bulk-IN data. macOS also entered sleep
+and completed repeated DarkWake cycles; these events are correlated, **not a
+confirmed root cause**.
 
-## Second reproduced hang and no-reset recovery (2026-10-24)
+The second failure was captured with an opt-in host USB trace:
 
-The diagnostic daemon was still alive after 10h 51m. The old USB device was
-still enumerated (\`original device enumerated=1\`) while a \`pspsh\` shell echo
-timed out. The host's **bulk OUT endpoint 0x03** write returned \`-7\`
-(\`LIBUSB_ERROR_TIMEOUT\`). This is the first capture of the failed transfer:
-
-\`\`\`text
+```text
 [USB trace 2026-10-24 23:53:05] async channel=0: submitted 14 bytes, transferred=-7
-\`\`\`
+```
 
-The original daemon was terminated with SIGKILL, deliberately avoiding its
-\`libusb_reset_device()\` cleanup call. macOS kept the **same** PSP device
-session ID \`118627976632\`. A new host process started with \`-T -N\`, reclaiming
-the same device without explicitly resetting USB. Real PSP shell/HostFS
-operations immediately recovered: first 3/3, then **120/120** native C smoke
-commands passed (p95 62ms, maximum 76ms).
+`-7` is `LIBUSB_ERROR_TIMEOUT`. The daemon received a TCP shell command, but
+its USB bulk OUT endpoint `0x03` write to the PSP did not complete within ten
+seconds. The Mac's bulk-IN timeout loop continued running and the existing
+libusb device object remained enumerated. This does not prove whether the PSP
+endpoint, host USB pipe, or host/device synchronization first became stuck.
 
-Thus **USB device reset and PSP reboot are not necessary for recovery**;
-closing/reclaiming the host USB interface was enough. This makes stale host
-interface/pipe state or a host/PSP endpoint synchronization problem more
-plausible. Interface release/reclaim may still cause lower-level pipe reset.
-The evidence does not prove which side caused the endpoint 3 stall.
+## Controlled recovery observations
 
-The \`-N\` option omits the normal \`libusb_reset_device()\` during host close,
-and is intended **only for controlled recovery comparisons**, not as a
-production change. Both \`-T\` and \`-N\` are opt-in.
+After the second *naturally occurring* hang, killing the host daemon without
+cleaning up its USB interface, then launching a fresh host process, recovered
+120/120 shell/HostFS commands **without USB re-enumeration or PSP reboot**.
+The macOS USB session ID remained unchanged. Thus the PSP application was not
+permanently deadlocked and a full reset is not always necessary.
 
-Candidate fix: when an async endpoint 3 write fails, request a safe main-thread
-reconnect, coordinate with the writer to complete outstanding transfers, then
-close and reclaim the interface without resetting the whole PSP USB device.
-The existing global \`usbhdr\` has cross-thread lifetime races, so reconnect
-must **never** close that handle while the async writer is still using it.
+However, a controlled **one-shot injected endpoint-3 timeout** exposed a
+recovery distinction: gracefully releasing/closing and reclaiming the same USB
+interface **without a device reset did not recover the handshake**. The host
+repeatedly connected but could not establish a functioning PSPLink session.
+Terminating a host process without cleanup is therefore **not equivalent** to
+gracefully releasing a libusb interface. The existing `-N` switch remains
+only for diagnosis; it is not recommended for production recovery.
 
-## Temporary host-only diagnostics
+## Experimental automatic recovery
 
-Build \`usbhostfs_pc\` and run it with \`-T\` for timestamped transport diagnostics:
+The investigation branch implements a conservative host-side recovery path:
 
-\`\`\`sh
-make -C usbhostfs_pc
-usbhostfs_pc/usbhostfs_pc -T -v /path/to/host/root
-\`\`\`
+1. The async thread acquires the active libusb handle and increments an
+   in-flight counter under a mutex. It releases the mutex before the actual
+   bulk OUT write, so normal shell responsiveness is not slowed by a
+   concurrent one-second bulk-IN wait.
+2. A failed/short endpoint-3 write sets a reconnect flag; later async writers
+   cannot acquire the failed handle.
+3. The main thread checks this flag between its bounded bulk-IN reads, stops
+   accepting new async transfers, and waits for existing writes to finish via
+   a condition variable before touching the handle.
+4. The main thread releases the interface, performs a **USB device reset**,
+   closes the handle, and reconnects/handshakes. This reproduces the previously
+   successful manual recovery without restarting either computer or PSPLinkUSB.
 
-\`-T\` deliberately **does not change USB recovery behavior**. It records:
+The existing endpoint-3 write timeout is ten seconds, and the idle bulk-IN read
+normally has a one-second timeout. Recovery begins when a write error is
+observed; **a command already in flight can be lost and may need retrying**.
+Do not blindly replay non-idempotent commands.
 
-- Once per 30 seconds of idle bulk-IN timeouts, whether the original open
-  \`libusb_device_handle\` refers to an object still in the current libusb device
-  list (\`1\` yes, \`0\` no, \`-1\` enumeration failure).
-- Errors from bulk-IN requests that end the main receive loop.
-- TCP async channel writes, their intended lengths and their transfer results.
-- Host USB handle shutdown/reconnect.
+This is a *recovery mechanism*, not an explanation or elimination of the
+underlying long-uptime failure. It is host-only: the PSP firmware is unchanged.
 
-Device identity is based on libusb's *object pointer*, not VID/PID or USB bus
-address, because re-enumeration may create a new device object with the same
-identifiers while an obsolete handle still retains the old object. A \`0\`
-result warrants a host reconnect investigation; it does **not** by itself
-prove that PSP firmware is deadlocked.
+## Validation
 
-The trace is printed to standard error, so capture it using a logfile.
-Avoid verbose \`-vv\` in unattended overnight tests; it prints every transfer.
-The installed unmodified \`usbhostfs_pc\` and PSP kernel module are not changed
-by building the diagnostic binary.
+- `make -C tests test` passes native-C HostFS directory, USB device identity,
+  and async recovery concurrency tests. The concurrency test holds an async
+  writer active while another thread attempts to retire the handle, then
+  checks that close/reset occurs only once it is safe.
+- Normal Mac host daemon builds successfully; no new warnings beyond the
+  existing unused `newpathlen` warning.
+- A test-only binary built with `-DPSPLINKUSB_TEST_INJECT_EP3_TIMEOUT` injects
+  **one** endpoint-3 `LIBUSB_ERROR_TIMEOUT`, without submitting that frame to
+  the PSP. The first shell command correctly fails. With USB reset enabled,
+  the daemon **automatically reconnects** and the native-C physical PSP test
+  subsequently passes **120/120 commands** (6.35 s, p95 77 ms, max 85 ms).
+  macOS observes USB re-enumeration as expected. The PSP application remains
+  running. The same injection with `-N` did **not** recover successfully.
+- The production build omits this injection; a separate 12/12 physical-PSP
+  baseline passed after switching to the normal host binary.
 
-## Manual sleep/wake test
+Evidence from the original hang and both injected tests was preserved locally
+under `~/Downloads/psplinkusb-issue74-*/`. See the GitHub issue for public
+observations; logs may contain local host file paths and are not uploaded.
 
-1. With the PSP running PSPLinkUSB and the diagnostic host daemon connected,
-   record the host PID, USB session identifier and a successful \`pspsh\` command.
-2. Put the Mac to sleep **manually** for a short interval and wake it, leaving
-   the PSP and USB cable untouched. Do not exit PSPLinkUSB.
-3. Before resetting anything, capture the host log, USB enumeration and a
-   bounded \`pspsh\` echo / HostFS listing.
-4. Compare device identity, write results on endpoint 3 and whether the main
-   bulk-IN loop resumes after waking.
+## Next required validation
 
-If the PSP becomes unresponsive, collect process samples and USB state before
-restarting the daemon. \`usbhostfs_pc\` calls \`libusb_reset_device()\` when
-closing a USB handle: a daemon restart therefore also performs a USB reset.
+Leave the non-injected, auto-recovery-capable host process attached to the
+physical PSP during a normal long idle period, including a macOS sleep/wake
+cycle if convenient. When it recurs, inspect whether the trace shows endpoint-3
+failure followed by the automatic USB reset and reconnection. Then verify a
+**new** shell and HostFS command succeeds without restarting the daemon or PSP.
 
-Do not blindly retry PSP static \`UsbdDeviceReq\` structures after timeouts
-unless prior request cancellation/completion and endpoint quiescence are
-confirmed.
-
-## Verification
-
-\`make -C tests test\` uses mocked libusb device lists to test matching and
-stale handles and enumeration failures, alongside the directory/HostFS
-protocol regression test. No PSP is required.
+If the host remains unresponsive despite the automatic recovery, capture the
+USB device enumeration, daemon threads and trace **before resetting anything**.
+That would justify targeted PSP-side endpoint/request-state instrumentation.
+Do not resubmit PSP static `UsbdDeviceReq` structures after a timeout unless
+request cancellation/completion and endpoint quiescence are confirmed.

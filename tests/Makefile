@@ -10,3 +10,6 @@ test:
 	@bin=$$(mktemp /tmp/psplinkusb-usb-identity-test.XXXXXX); \
 	trap 'rm -f "$$bin"' EXIT; \
 	$(CC) $(HOST_CFLAGS) -o "$$bin" usb_device_identity_test.c $(HOST_LIBS) && "$$bin"
+	@bin=$$(mktemp /tmp/psplinkusb-usb-recovery-test.XXXXXX); \
+	trap 'rm -f "$$bin"' EXIT; \
+	$(CC) $(HOST_CFLAGS) -o "$$bin" usb_async_recovery_test.c $(HOST_LIBS) && "$$bin"
