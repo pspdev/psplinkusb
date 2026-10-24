@@ -8,6 +8,40 @@ macOS had entered sleep and performed repeated maintenance wake cycles.
 This **does not establish sleep as the cause**. The pre-failure PSP-side USB
 request state was not captured. See GitHub issue #74 for the original evidence.
 
+## Second reproduced hang and no-reset recovery (2026-10-24)
+
+The diagnostic daemon was still alive after 10h 51m. The old USB device was
+still enumerated (\`original device enumerated=1\`) while a \`pspsh\` shell echo
+timed out. The host's **bulk OUT endpoint 0x03** write returned \`-7\`
+(\`LIBUSB_ERROR_TIMEOUT\`). This is the first capture of the failed transfer:
+
+\`\`\`text
+[USB trace 2026-10-24 23:53:05] async channel=0: submitted 14 bytes, transferred=-7
+\`\`\`
+
+The original daemon was terminated with SIGKILL, deliberately avoiding its
+\`libusb_reset_device()\` cleanup call. macOS kept the **same** PSP device
+session ID \`118627976632\`. A new host process started with \`-T -N\`, reclaiming
+the same device without explicitly resetting USB. Real PSP shell/HostFS
+operations immediately recovered: first 3/3, then **120/120** native C smoke
+commands passed (p95 62ms, maximum 76ms).
+
+Thus **USB device reset and PSP reboot are not necessary for recovery**;
+closing/reclaiming the host USB interface was enough. This makes stale host
+interface/pipe state or a host/PSP endpoint synchronization problem more
+plausible. Interface release/reclaim may still cause lower-level pipe reset.
+The evidence does not prove which side caused the endpoint 3 stall.
+
+The \`-N\` option omits the normal \`libusb_reset_device()\` during host close,
+and is intended **only for controlled recovery comparisons**, not as a
+production change. Both \`-T\` and \`-N\` are opt-in.
+
+Candidate fix: when an async endpoint 3 write fails, request a safe main-thread
+reconnect, coordinate with the writer to complete outstanding transfers, then
+close and reclaim the interface without resetting the whole PSP USB device.
+The existing global \`usbhdr\` has cross-thread lifetime races, so reconnect
+must **never** close that handle while the async writer is still using it.
+
 ## Temporary host-only diagnostics
 
 Build \`usbhostfs_pc\` and run it with \`-T\` for timestamped transport diagnostics:

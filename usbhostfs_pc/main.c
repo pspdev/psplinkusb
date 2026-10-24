@@ -109,6 +109,8 @@ char g_rootdir[PATH_MAX];
 int  g_verbose = 0;
 /* Opt-in transport trace for diagnosing macOS sleep/wake stalls. */
 static int g_trace_usb = 0;
+/* Diagnostic-only option for separating process restart from USB reset. */
+static int g_skip_close_reset = 0;
 int  g_gdbdebug = 0;
 int  g_nocase = 0;
 int  g_msslash = 0;
@@ -372,7 +374,8 @@ void close_device(libusb_device_handle *dev)
 	if(dev)
 	{
 		libusb_release_interface(dev, 0);
-		libusb_reset_device(dev);
+		if(!g_skip_close_reset)
+			libusb_reset_device(dev);
 		libusb_close(dev);
 	}
 }
@@ -2435,7 +2438,7 @@ int parse_args(int argc, char **argv)
 	{
 		int ch;
 
-		ch = getopt(argc, argv, "Tvghndcmb:p:f:t:");
+		ch = getopt(argc, argv, "TNvghndcmb:p:f:t:");
 		if(ch == -1)
 		{
 			break;
@@ -2444,6 +2447,8 @@ int parse_args(int argc, char **argv)
 		switch(ch)
 		{
 			case 'T': g_trace_usb = 1;
+					  break;
+			case 'N': g_skip_close_reset = 1;
 					  break;
 			case 'v': g_verbose++;
 					  break;
@@ -2512,6 +2517,7 @@ void print_help(void)
 	fprintf(stderr, "Options:\n");
 	fprintf(stderr, "-v                : Set verbose mode\n");
 	fprintf(stderr, "-T                : Trace USB progress and device identity (diagnostic only)\n");
+	fprintf(stderr, "-N                : Do not explicitly reset USB on close (diagnostic only)\n");
 	fprintf(stderr, "-vv               : More verbose\n");
 	fprintf(stderr, "-b port           : Specify the base async port (default %d)\n", BASE_PORT);
 	fprintf(stderr, "-g                : Specify global bind for the sockets, as opposed to just localhost\n");
