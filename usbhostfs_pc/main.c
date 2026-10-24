@@ -23,6 +23,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <time.h>
+#include <stdarg.h>
 #include <sys/stat.h>
 #include <sys/select.h>
 #include <utime.h>
@@ -106,6 +107,8 @@ struct HostDrive g_drives[MAX_HOSTDRIVES];
 char g_rootdir[PATH_MAX];
 
 int  g_verbose = 0;
+/* Opt-in transport trace for diagnosing macOS sleep/wake stalls. */
+static int g_trace_usb = 0;
 int  g_gdbdebug = 0;
 int  g_nocase = 0;
 int  g_msslash = 0;
@@ -114,6 +117,59 @@ int  g_timeout = USB_TIMEOUT;
 int  g_globalbind = 0;
 int  g_daemon = 0;
 unsigned short g_baseport = BASE_PORT;
+
+static void trace_usb(const char *format, ...)
+{
+	time_t now;
+	struct tm calendar;
+	char stamp[32];
+	va_list args;
+
+	if(!g_trace_usb)
+		return;
+	now = time(NULL);
+	localtime_r(&now, &calendar);
+	strftime(stamp, sizeof(stamp), "%Y-%m-%d %H:%M:%S", &calendar);
+	flockfile(stderr);
+	fprintf(stderr, "[USB trace %s] ", stamp);
+	va_start(args, format);
+	vfprintf(stderr, format, args);
+	va_end(args);
+	fputc('\n', stderr);
+	funlockfile(stderr);
+}
+
+/*
+ * Is this handle's libusb_device still in the active enumeration list?
+ * libusb holds a reference for the open handle, so a removed device may
+ * remain a valid pointer even after macOS re-enumerates a replacement.
+ * Only the main USB thread calls this while its handle is open.
+ * Return -1 when enumeration fails rather than treating it as a removal.
+ */
+static int usb_handle_enumerated(libusb_device_handle *handle)
+{
+	libusb_device **devices;
+	libusb_device *attached;
+	ssize_t count, i;
+	int found = 0;
+
+	if(!handle)
+		return 0;
+	attached = libusb_get_device(handle);
+	count = libusb_get_device_list(usbctx, &devices);
+	if(count < 0)
+		return -1;
+	for(i = 0; i < count; i++)
+	{
+		if(devices[i] == attached)
+		{
+			found = 1;
+			break;
+		}
+	}
+	libusb_free_device_list(devices, 1);
+	return found;
+}
 
 #define V_PRINTF(level, fmt, ...) { if(g_verbose >= level) { fprintf(stderr, fmt, ## __VA_ARGS__); } }
 
@@ -2284,10 +2340,25 @@ int start_hostfs(void)
 					}
 					else if(readlen == LIBUSB_ERROR_TIMEOUT)
 					{
+						/* Diagnostic-only: distinguish idle timeouts from a stale
+						 * device handle after sleep/wake or USB re-enumeration. */
+						if(g_trace_usb)
+						{
+							static time_t last_trace;
+							time_t now = time(NULL);
+							if(now != (time_t)-1 && (last_trace == 0 || now - last_trace >= 30))
+							{
+								int present = usb_handle_enumerated(usbhdr);
+								trace_usb("idle bulk-IN timeout; original device enumerated=%d", present);
+								last_trace = now;
+							}
+						}
 						continue;
 					}
 					else if(readlen < 0)
 					{
+						trace_usb("bulk-IN error=%d (%s); reconnecting", readlen,
+							libusb_error_name(readlen));
 						break;
 					}
 
@@ -2334,6 +2405,7 @@ int start_hostfs(void)
 				}
 			}
 
+			trace_usb("closing USB device handle; reconnect requested");
 			close_device(usbhdr);
 			usbhdr = NULL;
 		}
@@ -2363,7 +2435,7 @@ int parse_args(int argc, char **argv)
 	{
 		int ch;
 
-		ch = getopt(argc, argv, "vghndcmb:p:f:t:");
+		ch = getopt(argc, argv, "Tvghndcmb:p:f:t:");
 		if(ch == -1)
 		{
 			break;
@@ -2371,6 +2443,8 @@ int parse_args(int argc, char **argv)
 
 		switch(ch)
 		{
+			case 'T': g_trace_usb = 1;
+					  break;
 			case 'v': g_verbose++;
 					  break;
 			case 'b': g_baseport = atoi(optarg);
@@ -2437,6 +2511,7 @@ void print_help(void)
 	fprintf(stderr, "Usage: usbhostfs_pc [options] [rootdir0..rootdir%d]\n", MAX_HOSTDRIVES-1);
 	fprintf(stderr, "Options:\n");
 	fprintf(stderr, "-v                : Set verbose mode\n");
+	fprintf(stderr, "-T                : Trace USB progress and device identity (diagnostic only)\n");
 	fprintf(stderr, "-vv               : More verbose\n");
 	fprintf(stderr, "-b port           : Specify the base async port (default %d)\n", BASE_PORT);
 	fprintf(stderr, "-g                : Specify global bind for the sockets, as opposed to just localhost\n");
@@ -3104,7 +3179,10 @@ void *async_thread(void *arg)
 							if(usbhdr)
 							{
 								cmd->channel = LE32(i);
-								euid_usb_bulk_write(usbhdr, 0x3, buf, readbytes+sizeof(struct AsyncCommand), 10000);
+								int sent = euid_usb_bulk_write(usbhdr, 0x3, buf,
+									readbytes+sizeof(struct AsyncCommand), 10000);
+								trace_usb("async channel=%d: submitted %d bytes, transferred=%d",
+									i, readbytes+ (int)sizeof(struct AsyncCommand), sent);
 							}
 						}
 						else
