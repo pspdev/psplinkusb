@@ -228,7 +228,7 @@ int euid_usb_bulk_read(libusb_device_handle *dev, int ep, char *bytes, int size,
 
 	V_PRINTF(2, "Bulk Read dev %p, ep 0x%x, bytes %p, size %d, timeout %d\n",
 			dev, ep, bytes, size, timeout);
-	int ret = libusb_bulk_transfer(usbhdr, ep, (unsigned char*)bytes, size, &rdbytes, timeout);
+	int ret = libusb_bulk_transfer(dev, ep, (unsigned char*)bytes, size, &rdbytes, timeout);
 	if (!ret)
 		ret = rdbytes;
 
@@ -698,7 +698,8 @@ int fill_stat(const char *dirname, const char *name, SceIoStat *scestat)
 		strcpy(path, name);
 	}
 
-	if(stat(path, &st) < 0)
+	/* Preserve dangling symlinks as directory entries rather than failing the listing. */
+	if(lstat(path, &st) < 0)
 	{
 		fprintf(stderr, "Couldn't stat file %s (%s)\n", path, strerror(errno));
 		return GETERROR(errno);
@@ -804,6 +805,7 @@ int dir_open(int drive, const char *dirname)
 			else
 			{
 				free(open_dirs[did].pDir);
+				open_dirs[did].pDir = NULL;
 			}
 		}
 		else
@@ -811,14 +813,12 @@ int dir_open(int drive, const char *dirname)
 			fprintf(stderr, "Could not allocate memory for directories\n");
 		}
 
-		if(ret < 0)
+		/* scandir owns these allocations even when the listing succeeds. */
+		for(i = 0; i < dirnum; i++)
 		{
-			for(i = 0; i < dirnum; i++)
-			{
-				free(entries[i]);
-			}
-			free(entries);
+			free(entries[i]);
 		}
+		free(entries);
 	}
 	while(0);
 
@@ -1230,7 +1230,7 @@ int handle_dread(libusb_device_handle *dev, struct HostFsDreadCmd *cmd, int cmdl
 
 	memset(&resp, 0, sizeof(resp));
 	resp.cmd.magic = LE32(HOSTFS_MAGIC);
-	resp.cmd.command = LE32(HOSTFS_CMD_READ);
+	resp.cmd.command = LE32(HOSTFS_CMD_DREAD);
 	resp.res = LE32(-1);
 
 	do
