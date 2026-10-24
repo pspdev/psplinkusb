@@ -366,7 +366,8 @@ int read_data(void *data, int size)
 		ret = sceKernelWaitEventFlag(g_transevent, USB_TRANSEVENT_BULKOUT_DONE, PSP_EVENT_WAITOR | PSP_EVENT_WAITCLEAR, &result, NULL);
 		if(ret == 0)
 		{
-			if((g_bulkout_req.retcode == 0) && (g_bulkout_req.recvsize > 0))
+			if((g_bulkout_req.retcode == 0) && (g_bulkout_req.recvsize > 0)
+					&& (g_bulkout_req.recvsize <= nextsize))
 			{
 				readlen += g_bulkout_req.recvsize;
 				memcpy(data, tx_buf, g_bulkout_req.recvsize);
@@ -401,12 +402,17 @@ int write_data(const void *data, int size)
 		{
 			nextsize = (size - writelen) > sizeof(tx_buf) ? sizeof(tx_buf) : (size - writelen);
 			memcpy(tx_buf, data, nextsize);
-			set_bulkin_req(tx_buf, nextsize);
+			if(set_bulkin_req(tx_buf, nextsize) < 0)
+			{
+				MODPRINTF("Could not queue BULKIN request\n");
+				return -1;
+			}
 			/* TODO: Add a timeout to the event flag wait */
 			ret = sceKernelWaitEventFlag(g_transevent, USB_TRANSEVENT_BULKIN_DONE, PSP_EVENT_WAITOR | PSP_EVENT_WAITCLEAR, &result, NULL);
 			if(ret == 0)
 			{
-				if((g_bulkin_req.retcode == 0) && (g_bulkin_req.recvsize > 0))
+				if((g_bulkin_req.retcode == 0) && (g_bulkin_req.recvsize > 0)
+						&& (g_bulkin_req.recvsize <= nextsize))
 				{
 					writelen += g_bulkin_req.recvsize;
 					data += g_bulkin_req.recvsize;
@@ -429,12 +435,17 @@ int write_data(const void *data, int size)
 		while(writelen < size)
 		{
 			nextsize = (size - writelen) > sizeof(tx_buf) ? sizeof(tx_buf) : (size - writelen);
-			set_bulkin_req((char *) data, nextsize);
+			if(set_bulkin_req((char *) data, nextsize) < 0)
+			{
+				MODPRINTF("Could not queue BULKIN request\n");
+				return -1;
+			}
 			/* TODO: Add a timeout to the event flag wait */
 			ret = sceKernelWaitEventFlag(g_transevent, USB_TRANSEVENT_BULKIN_DONE, PSP_EVENT_WAITOR | PSP_EVENT_WAITCLEAR, &result, NULL);
 			if(ret == 0)
 			{
-				if((g_bulkin_req.retcode == 0) && (g_bulkin_req.recvsize > 0))
+				if((g_bulkin_req.retcode == 0) && (g_bulkin_req.recvsize > 0)
+						&& (g_bulkin_req.recvsize <= nextsize))
 				{
 					writelen += g_bulkin_req.recvsize;
 					data += g_bulkin_req.recvsize;
@@ -466,11 +477,15 @@ int write_data_large(const void *data, int size)
 		return -1;
 	}
 
-	set_bulkin_req((char *) data, size);
+	if(set_bulkin_req((char *) data, size) < 0)
+	{
+		MODPRINTF("Could not queue large BULKIN request\n");
+		return -1;
+	}
 	ret = sceKernelWaitEventFlag(g_transevent, USB_TRANSEVENT_BULKIN_DONE, PSP_EVENT_WAITOR | PSP_EVENT_WAITCLEAR, &result, NULL);
 	if(ret == 0)
 	{
-		if((g_bulkin_req.retcode == 0) && (g_bulkin_req.recvsize > 0))
+		if((g_bulkin_req.retcode == 0) && (g_bulkin_req.recvsize == size))
 		{
 		}
 		else
@@ -539,7 +554,7 @@ int command_xchg(void *outcmd, int outcmdlen, void *incmd, int incmdlen, const v
 				break;
 			}
 
-			if((resp->magic != HOSTFS_MAGIC) && (resp->command != cmd->command))
+			if((resp->magic != HOSTFS_MAGIC) || (resp->command != cmd->command))
 			{
 				MODPRINTF("Invalid response packet magic: %08X, command: %08X\n", resp->magic, resp->command);
 				break;
@@ -548,8 +563,12 @@ int command_xchg(void *outcmd, int outcmdlen, void *incmd, int incmdlen, const v
 			DEBUG_PRINTF("resp->magic %08X, resp->command %08X, resp->extralen %d\n", 
 					resp->magic, resp->command, resp->extralen);
 
-			/* TODO: Should add checks for inlen being less that extra len */
-			if((resp->extralen > 0) && (inlen > 0))
+			if((resp->extralen < 0) || (resp->extralen > inlen))
+			{
+				MODPRINTF("Invalid response payload length %d (capacity %d)\n", resp->extralen, inlen);
+				break;
+			}
+			if(resp->extralen > 0)
 			{
 				err = read_data(indata, resp->extralen);
 				if(err != resp->extralen)
@@ -1010,21 +1029,32 @@ int usb_thread(SceSize size, void *argp)
 			sceKernelExitDeleteThread(0);
 		}
 
-		if(result & USB_EVENT_ASYNC)
-		{
-			DEBUG_PRINTF("Async Request Done %d %d\n", g_async_req.retcode, g_async_req.recvsize);
-			if((g_async_req.retcode == 0) && (g_async_req.recvsize > 0))
-			{
-				fill_async(async_data, g_async_req.recvsize);
-				set_ayncreq(async_data, sizeof(async_data));
-			}
-		}
-
 		if(result & USB_EVENT_DETACH)
 		{
 			g_connected = 0;
 			sceKernelClearEventFlag(g_mainevent, ~USB_EVENT_CONNECT);
 			DEBUG_PRINTF("USB Detach occurred\n");
+		}
+
+		if(result & USB_EVENT_ASYNC)
+		{
+			DEBUG_PRINTF("Async Request Done %d %d\n", g_async_req.retcode, g_async_req.recvsize);
+			if(g_connected)
+			{
+				if((g_async_req.retcode == 0) && (g_async_req.recvsize > 0))
+				{
+					fill_async(async_data, g_async_req.recvsize);
+				}
+				else
+				{
+					/* A transient receive error must not permanently disable the shell. */
+					sceKernelDelayThread(100000);
+				}
+				if(set_ayncreq(async_data, sizeof(async_data)) < 0)
+				{
+					MODPRINTF("Could not restart async USB receive\n");
+				}
+			}
 		}
 
 		if(result & USB_EVENT_ATTACH)
@@ -1039,9 +1069,11 @@ int usb_thread(SceSize size, void *argp)
 				{
 					if(send_hello_cmd())
 					{
-						set_ayncreq(async_data, sizeof(async_data));
-						g_connected = 1;
-						sceKernelSetEventFlag(g_mainevent, USB_EVENT_CONNECT);
+						if(set_ayncreq(async_data, sizeof(async_data)) >= 0)
+						{
+							g_connected = 1;
+							sceKernelSetEventFlag(g_mainevent, USB_EVENT_CONNECT);
+						}
 					}
 				}
 			}
@@ -1057,6 +1089,7 @@ int start_func(int size, void *p)
 	int ret;
 
 	DEBUG_PRINTF("Start Function %p\n", p);
+	g_connected = 0;
 
 	/* Fill in the descriptor tables */
 	memset(usbdata, 0, sizeof(usbdata));
@@ -1152,6 +1185,7 @@ int start_func(int size, void *p)
 int stop_func(int size, void *p)
 {
 	DEBUG_PRINTF("Stop function %p\n", p);
+	g_connected = 0;
 
 	if(g_thid >= 0)
 	{
@@ -1169,7 +1203,7 @@ int stop_func(int size, void *p)
 	if(g_transevent >= 0)
 	{
 		sceKernelDeleteEventFlag(g_transevent);
-		g_mainevent = -1;
+		g_transevent = -1;
 	}
 
 	if(g_asyncevent >= 0)
