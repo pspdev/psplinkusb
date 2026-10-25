@@ -97,3 +97,55 @@ USB device enumeration, daemon threads and trace **before resetting anything**.
 That would justify targeted PSP-side endpoint/request-state instrumentation.
 Do not resubmit PSP static `UsbdDeviceReq` structures after a timeout unless
 request cancellation/completion and endpoint quiescence are confirmed.
+
+## Third naturally reproduced hang: completed endpoint-3 writes, no response
+
+On 2026-10-25 after approximately 14h 13m of uptime with the endpoint-error
+recovery candidate running, `pspsh` became unresponsive again following
+multiple macOS system-sleep / DarkWake cycles. The host still enumerated the
+original PSP USB session and listened on the TCP shell port. Unlike the second
+hang, **USB endpoint 0x03 transferred the entire 14-byte shell frame** both at
+13:28:20 and 13:30:11 CET. The native-C shell echo timed out without any
+response from the PSP. There were no USB transfer errors and thus the first
+recovery implementation did not trigger. Host thread samples and logs were
+saved under `~/Downloads/psplinkusb-issue74-freeze3-20261025/`.
+
+This demonstrates two observable failure modes: the host-to-PSP USB request
+may time out, or it may report success **without the PSP producing shell
+output**. A successful host bulk transfer does not imply that the PSP's async
+receive callback/command parser ran. Sleep correlates strongly with both,
+but is not yet proven causal.
+
+## Experimental `-W`: reconnect after macOS sleep
+
+To address the successful-write/silent-shell mode without replaying possibly
+non-idempotent commands, run the experimental host binary with `-W` (macOS
+only). It compares `CLOCK_MONOTONIC` (advances through sleep) and
+`CLOCK_UPTIME_RAW` (only advances while awake). When the delta shows more than
+five seconds asleep, the main thread stops admitting new async writes, waits
+for any in-flight writes to complete, and **resets and reconnects USB**. The
+existing endpoint-3 error recovery remains active. `-W` cannot be combined
+with diagnostic `-N` (which suppresses USB reset). Wake recovery is deliberately
+opt-in and changes only the Mac daemon, not the PSP firmware.
+
+`-W` detects system sleep, **including maintenance DarkWake cycles**. This
+could cause periodic USB re-enumeration overnight, so review log frequency
+before enabling the policy by default. The reset itself can interrupt a
+command that was already running when the Mac suspended; commands are not
+replayed automatically.
+
+A test-only build with `-DPSPLINKUSB_TEST_INJECT_WAKE` simulated a 120-second
+suspend immediately after the initial HostFS handshake. The daemon detected
+the synthetic wake, automatically reset/re-enumerated the PSP and recovered
+**120/120 real-PSP shell/HostFS operations** (6.73 s, p95 76ms, max 91ms).
+The normal (non-injected) `-T -W -v` daemon then passed **12/12** followed by
+**1,000/1,000** PSP operations (50.47 s, p95 77ms, max 91ms) with no errors.
+All four C regression tests pass, including a new injected-clock test for
+normal elapsed time vs sleep gaps.
+
+The normal experimental daemon was started as PID 19673 on 2026-10-25 around
+13:40 CET. The test injectors are compiled out of this normal binary. Before
+claiming a fix, the next step is a **real macOS sleep and wake**, followed by
+a bounded PSP shell and HostFS test. Then a longer soak is necessary. The
+underlying PSP-side endpoint state across sleep is not yet known, and #74
+must remain open.

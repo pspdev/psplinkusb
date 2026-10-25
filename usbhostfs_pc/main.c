@@ -186,6 +186,9 @@ int  g_verbose = 0;
 static int g_trace_usb = 0;
 /* Diagnostic-only option for separating process restart from USB reset. */
 static int g_skip_close_reset = 0;
+/* Opt-in macOS wake recovery: stale PSP async state can have successful
+ * host-to-PSP writes but no shell response after the Mac resumes from sleep. */
+static int g_reconnect_on_wake = 0;
 int  g_gdbdebug = 0;
 int  g_nocase = 0;
 int  g_msslash = 0;
@@ -214,6 +217,62 @@ static void trace_usb(const char *format, ...)
 	va_end(args);
 	fputc('\n', stderr);
 	funlockfile(stderr);
+}
+
+#define USB_SLEEP_GAP_SECONDS 5.0
+
+struct UsbSuspendClock
+{
+	double previous_continuous;
+	double previous_awake;
+	int initialized;
+};
+
+/* Return newly accumulated sleep time; not ordinary elapsed idle time. */
+static double usb_suspend_elapsed(struct UsbSuspendClock *state, double continuous,
+	double awake)
+{
+	double slept = 0;
+	if(state->initialized)
+	{
+		slept = (continuous - state->previous_continuous) -
+			(awake - state->previous_awake);
+	}
+	state->previous_continuous = continuous;
+	state->previous_awake = awake;
+	state->initialized = 1;
+	return slept > USB_SLEEP_GAP_SECONDS ? slept : 0;
+}
+
+/* On macOS MONOTONIC continues through system sleep; UPTIME_RAW doesn't.
+ * The function only runs in the host's main USB thread. */
+static double usb_check_mac_sleep(struct UsbSuspendClock *state)
+{
+#ifdef __APPLE__
+	struct timespec mono, awake;
+	if(clock_gettime(CLOCK_MONOTONIC, &mono) != 0 ||
+		clock_gettime(CLOCK_UPTIME_RAW, &awake) != 0)
+		return 0;
+#ifdef PSPLINKUSB_TEST_INJECT_WAKE
+	/* Test-only artificial resume event, injected after an initial reading. */
+	{
+		static int calls;
+		double result = usb_suspend_elapsed(state,
+			(double)mono.tv_sec + (double)mono.tv_nsec / 1000000000.0,
+			(double)awake.tv_sec + (double)awake.tv_nsec / 1000000000.0);
+		if(++calls == 2)
+			return 120.0;
+		return result;
+	}
+#else
+	return usb_suspend_elapsed(state,
+		(double)mono.tv_sec + (double)mono.tv_nsec / 1000000000.0,
+		(double)awake.tv_sec + (double)awake.tv_nsec / 1000000000.0);
+#endif
+#else
+	(void)state;
+	return 0;
+#endif
 }
 
 /*
@@ -2409,15 +2468,19 @@ int start_hostfs(void)
 {
 	uint32_t data[512/sizeof(uint32_t)];
 	int readlen;
+	struct UsbSuspendClock sleep_clock = {0};
 
 	while(1)
 	{
 		libusb_device_handle *dev;
 		int async_reconnect;
+		int woke_from_sleep = 0;
 		init_hostfs();
 
 		dev = wait_for_device();
 		usb_publish_handle(dev);
+		if(g_reconnect_on_wake)
+			(void)usb_check_mac_sleep(&sleep_clock);
 
 		if(dev)
 		{
@@ -2429,9 +2492,33 @@ int start_hostfs(void)
 			{
 				while(1)
 				{
+					if(g_reconnect_on_wake)
+					{
+						double slept = usb_check_mac_sleep(&sleep_clock);
+						if(slept > 0)
+						{
+							fprintf(stderr, "Mac resumed from %.1fs of sleep; refreshing PSP USB session\n",
+								slept);
+							trace_usb("wake-triggered reconnect after %.1fs of sleep", slept);
+							woke_from_sleep = 1;
+							break;
+						}
+					}
 					if(usb_reconnect_pending())
 						break;
 					readlen = euid_usb_bulk_read(dev, 0x81, (char*) data, 512, g_timeout);
+					if(g_reconnect_on_wake)
+					{
+						double slept = usb_check_mac_sleep(&sleep_clock);
+						if(slept > 0)
+						{
+							fprintf(stderr, "Mac resumed from %.1fs of sleep; refreshing PSP USB session\n",
+								slept);
+							trace_usb("wake-triggered reconnect after %.1fs of sleep", slept);
+							woke_from_sleep = 1;
+							break;
+						}
+					}
 					if(usb_reconnect_pending())
 						break;
 					if(readlen == 0)
@@ -2507,10 +2594,12 @@ int start_hostfs(void)
 			}
 
 			dev = usb_take_handle(&async_reconnect);
-			if(async_reconnect)
+			if(async_reconnect || woke_from_sleep)
 			{
-				fprintf(stderr, "Async USB transfer failed; resetting and reconnecting device\n");
-				trace_usb("recovering async endpoint with coordinated device reset");
+				if(async_reconnect)
+					fprintf(stderr, "Async USB transfer failed; resetting and reconnecting device\n");
+				trace_usb("coordinated USB reset (async failure=%d wake=%d)",
+					async_reconnect, woke_from_sleep);
 				close_device(dev);
 			}
 			else
@@ -2545,7 +2634,7 @@ int parse_args(int argc, char **argv)
 	{
 		int ch;
 
-		ch = getopt(argc, argv, "TNvghndcmb:p:f:t:");
+		ch = getopt(argc, argv, "TNWvghndcmb:p:f:t:");
 		if(ch == -1)
 		{
 			break;
@@ -2556,6 +2645,8 @@ int parse_args(int argc, char **argv)
 			case 'T': g_trace_usb = 1;
 					  break;
 			case 'N': g_skip_close_reset = 1;
+					  break;
+			case 'W': g_reconnect_on_wake = 1;
 					  break;
 			case 'v': g_verbose++;
 					  break;
@@ -2582,6 +2673,12 @@ int parse_args(int argc, char **argv)
 					  return 0;
 					  break;
 		};
+	}
+
+	if(g_reconnect_on_wake && g_skip_close_reset)
+	{
+		fprintf(stderr, "-W requires USB device reset, so it cannot be combined with -N\n");
+		return 0;
 	}
 
 	argc -= optind;
@@ -2625,6 +2722,7 @@ void print_help(void)
 	fprintf(stderr, "-v                : Set verbose mode\n");
 	fprintf(stderr, "-T                : Trace USB progress and device identity (diagnostic only)\n");
 	fprintf(stderr, "-N                : Do not explicitly reset USB on close (diagnostic only)\n");
+	fprintf(stderr, "-W                : Refresh USB connection on macOS wake (experimental)\n");
 	fprintf(stderr, "-vv               : More verbose\n");
 	fprintf(stderr, "-b port           : Specify the base async port (default %d)\n", BASE_PORT);
 	fprintf(stderr, "-g                : Specify global bind for the sockets, as opposed to just localhost\n");
