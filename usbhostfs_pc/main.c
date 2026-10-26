@@ -228,7 +228,7 @@ int euid_usb_bulk_read(libusb_device_handle *dev, int ep, char *bytes, int size,
 
 	V_PRINTF(2, "Bulk Read dev %p, ep 0x%x, bytes %p, size %d, timeout %d\n",
 			dev, ep, bytes, size, timeout);
-	int ret = libusb_bulk_transfer(usbhdr, ep, (unsigned char*)bytes, size, &rdbytes, timeout);
+	int ret = libusb_bulk_transfer(dev, ep, (unsigned char*)bytes, size, &rdbytes, timeout);
 	if (!ret)
 		ret = rdbytes;
 
