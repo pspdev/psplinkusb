@@ -149,3 +149,36 @@ claiming a fix, the next step is a **real macOS sleep and wake**, followed by
 a bounded PSP shell and HostFS test. Then a longer soak is necessary. The
 underlying PSP-side endpoint state across sleep is not yet known, and #74
 must remain open.
+
+## Overnight validation: real repeated DarkWake cycles (2026-10-26)
+
+After the first real wake test, the user left the normal, non-injected
+`usbhostfs_pc -T -W -v` host daemon and physical PSP running overnight.
+At **07:53 CET on 2026-10-26**, the original host process PID **19673**
+was still alive after **18h 13m** (RSS approximately **7.9 MiB**),
+owned the Sony PSP USB interface, and still accepted shell connections.
+A new native-C hardware smoke test passed **120/120** shell/HostFS commands
+in **6.34s** (p95 **76ms**, maximum **82ms**) without restarting PSPLinkUSB,
+the cable, or the host process.
+
+The overnight trace records **28** wake-triggered reconnects, each followed
+by successful USB re-enumeration/HostFS reconnection, and **two** bulk-IN
+`LIBUSB_ERROR_IO` reconnect events (15:50:11 and 18:33:58 on October 25).
+There were **zero** endpoint-3 async write failures in this period.
+macOS power history corroborates repeated maintenance DarkWake cycles
+throughout the night.
+
+This is our **first successful real overnight workaround validation** and
+supports the hypothesis that proactively refreshing USB after sleep is useful.
+It does **not** establish the original root cause or that the link would
+otherwise have failed during this particular overnight period.
+
+**Remaining problem:** `-W` resets the entire PSP USB device on *every*
+qualifying wake, including DarkWake maintenance periods, causing **28 USB
+resets in approximately 18 hours**. This is more intrusive than desirable for
+a production patch. Future work should distinguish maintenance DarkWake from
+interactive full wake or use an application-level PSP liveness/HELLO roundtrip
+before resetting, while avoiding unsafe retransmission of commands. Do not
+promote `-W` to a production default yet. Keep issue #74 open.
+
+Full local snapshots: `~/Downloads/psplinkusb-issue74-wake-recovery-20261025/overnight-20261026/`.
