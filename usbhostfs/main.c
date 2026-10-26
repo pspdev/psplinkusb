@@ -366,7 +366,8 @@ int read_data(void *data, int size)
 		ret = sceKernelWaitEventFlag(g_transevent, USB_TRANSEVENT_BULKOUT_DONE, PSP_EVENT_WAITOR | PSP_EVENT_WAITCLEAR, &result, NULL);
 		if(ret == 0)
 		{
-			if((g_bulkout_req.retcode == 0) && (g_bulkout_req.recvsize > 0))
+			if((g_bulkout_req.retcode == 0) && (g_bulkout_req.recvsize > 0)
+					&& (g_bulkout_req.recvsize <= nextsize))
 			{
 				readlen += g_bulkout_req.recvsize;
 				memcpy(data, tx_buf, g_bulkout_req.recvsize);
@@ -401,12 +402,17 @@ int write_data(const void *data, int size)
 		{
 			nextsize = (size - writelen) > sizeof(tx_buf) ? sizeof(tx_buf) : (size - writelen);
 			memcpy(tx_buf, data, nextsize);
-			set_bulkin_req(tx_buf, nextsize);
+			if(set_bulkin_req(tx_buf, nextsize) < 0)
+			{
+				MODPRINTF("Could not queue BULKIN request\n");
+				return -1;
+			}
 			/* TODO: Add a timeout to the event flag wait */
 			ret = sceKernelWaitEventFlag(g_transevent, USB_TRANSEVENT_BULKIN_DONE, PSP_EVENT_WAITOR | PSP_EVENT_WAITCLEAR, &result, NULL);
 			if(ret == 0)
 			{
-				if((g_bulkin_req.retcode == 0) && (g_bulkin_req.recvsize > 0))
+				if((g_bulkin_req.retcode == 0) && (g_bulkin_req.recvsize > 0)
+						&& (g_bulkin_req.recvsize <= nextsize))
 				{
 					writelen += g_bulkin_req.recvsize;
 					data += g_bulkin_req.recvsize;
@@ -429,12 +435,17 @@ int write_data(const void *data, int size)
 		while(writelen < size)
 		{
 			nextsize = (size - writelen) > sizeof(tx_buf) ? sizeof(tx_buf) : (size - writelen);
-			set_bulkin_req((char *) data, nextsize);
+			if(set_bulkin_req((char *) data, nextsize) < 0)
+			{
+				MODPRINTF("Could not queue BULKIN request\n");
+				return -1;
+			}
 			/* TODO: Add a timeout to the event flag wait */
 			ret = sceKernelWaitEventFlag(g_transevent, USB_TRANSEVENT_BULKIN_DONE, PSP_EVENT_WAITOR | PSP_EVENT_WAITCLEAR, &result, NULL);
 			if(ret == 0)
 			{
-				if((g_bulkin_req.retcode == 0) && (g_bulkin_req.recvsize > 0))
+				if((g_bulkin_req.retcode == 0) && (g_bulkin_req.recvsize > 0)
+						&& (g_bulkin_req.recvsize <= nextsize))
 				{
 					writelen += g_bulkin_req.recvsize;
 					data += g_bulkin_req.recvsize;
@@ -466,11 +477,15 @@ int write_data_large(const void *data, int size)
 		return -1;
 	}
 
-	set_bulkin_req((char *) data, size);
+	if(set_bulkin_req((char *) data, size) < 0)
+	{
+		MODPRINTF("Could not queue large BULKIN request\n");
+		return -1;
+	}
 	ret = sceKernelWaitEventFlag(g_transevent, USB_TRANSEVENT_BULKIN_DONE, PSP_EVENT_WAITOR | PSP_EVENT_WAITCLEAR, &result, NULL);
 	if(ret == 0)
 	{
-		if((g_bulkin_req.retcode == 0) && (g_bulkin_req.recvsize > 0))
+		if((g_bulkin_req.retcode == 0) && (g_bulkin_req.recvsize == size))
 		{
 		}
 		else
@@ -539,7 +554,7 @@ int command_xchg(void *outcmd, int outcmdlen, void *incmd, int incmdlen, const v
 				break;
 			}
 
-			if((resp->magic != HOSTFS_MAGIC) && (resp->command != cmd->command))
+			if((resp->magic != HOSTFS_MAGIC) || (resp->command != cmd->command))
 			{
 				MODPRINTF("Invalid response packet magic: %08X, command: %08X\n", resp->magic, resp->command);
 				break;
@@ -548,8 +563,12 @@ int command_xchg(void *outcmd, int outcmdlen, void *incmd, int incmdlen, const v
 			DEBUG_PRINTF("resp->magic %08X, resp->command %08X, resp->extralen %d\n", 
 					resp->magic, resp->command, resp->extralen);
 
-			/* TODO: Should add checks for inlen being less that extra len */
-			if((resp->extralen > 0) && (inlen > 0))
+			if((resp->extralen < 0) || (resp->extralen > inlen))
+			{
+				MODPRINTF("Invalid response payload length %d (capacity %d)\n", resp->extralen, inlen);
+				break;
+			}
+			if(resp->extralen > 0)
 			{
 				err = read_data(indata, resp->extralen);
 				if(err != resp->extralen)
