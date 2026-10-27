@@ -182,3 +182,30 @@ before resetting, while avoiding unsafe retransmission of commands. Do not
 promote `-W` to a production default yet. Keep issue #74 open.
 
 Full local snapshots: `~/Downloads/psplinkusb-issue74-wake-recovery-20261025/overnight-20261026/`.
+
+## Second consecutive overnight: still responsive after >43 hours (2026-10-27)
+
+At **09:11 CET on October 27**, the user reported that `pspsh` still worked
+following a second overnight interval. The Mac daemon was the **same PID
+19673**, launched **October 25 at 13:40 CET**, up for approximately **43h 32m**.
+The PSP was still enumerated and claimed by that process; resident memory was
+approximately **7.4 MiB**. A new physical-PSP C smoke test independently
+passed **120/120** shell/HostFS commands in **5.75s** (p95 **75ms**, max
+**87ms**), with no manual PSP or host restart.
+
+Across the **entire >43-hour run** the trace records **50** wake-triggered
+coordinated USB resets/reconnections, **23** independent `bulk-IN` USB I/O
+errors (`LIBUSB_ERROR_IO`) and **zero** async endpoint-3 transfer failures.
+Twenty-one of those bulk-IN I/O errors occurred after the first morning's
+validation, mainly during October 26 daytime; these errors were nonfatal and
+the session recovered. The overnight macOS power log confirms further
+maintenance DarkWake cycles, with the latest wake-triggered reset at **07:54
+CET on October 27**. The daemon and physical console remain operational.
+
+This strengthens confidence in the **opt-in recovery workaround**, not in
+preventing the original error or identifying its root cause. The number of
+resets remains too high for default production behavior. The next refinement
+should distinguish maintenance wake from true application liveness failure,
+while preserving safe USB-handle lifetime synchronization.
+
+Local evidence: `~/Downloads/psplinkusb-issue74-wake-recovery-20261025/overnight-20261027/`.
