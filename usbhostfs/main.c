@@ -11,6 +11,7 @@
 #include <pspkernel.h>
 #include <pspdebug.h>
 #include <pspkdebug.h>
+#include <pspkerror.h>
 #include <pspsdk.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1017,39 +1018,103 @@ int usb_thread(SceSize size, void *argp)
 {
 	int ret;
 	u32 result;
+	int retry_async = 0;
 
 	DEBUG_PRINTF("USB Thread Started\n");
 	while(1)
 	{
+		SceUInt timeout = 100000;
 		ret = sceKernelWaitEventFlag(g_mainevent, USB_EVENT_ATTACH | USB_EVENT_DETACH | USB_EVENT_ASYNC
-				, PSP_EVENT_WAITOR | PSP_EVENT_WAITCLEAR, &result, NULL);
+				, PSP_EVENT_WAITOR | PSP_EVENT_WAITCLEAR, &result,
+				retry_async ? &timeout : NULL);
+		if(retry_async && (ret == (int)SCE_KERNEL_ERROR_WAIT_TIMEOUT))
+		{
+			/* Retry while processing attach/detach events without delay. */
+			if(g_connected && (sceUsbGetState() & PSP_USB_CONNECTION_ESTABLISHED))
+			{
+				if(set_ayncreq(async_data, sizeof(async_data)) >= 0)
+					retry_async = 0;
+			}
+			else
+			{
+				retry_async = 0;
+				g_connected = 0;
+				sceKernelClearEventFlag(g_mainevent, ~USB_EVENT_CONNECT);
+			}
+			continue;
+		}
 		if(ret < 0)
 		{
 			DEBUG_PRINTF("Error waiting on event flag %08X\n", ret);
 			sceKernelExitDeleteThread(0);
 		}
 
-		if(result & USB_EVENT_ASYNC)
-		{
-			DEBUG_PRINTF("Async Request Done %d %d\n", g_async_req.retcode, g_async_req.recvsize);
-			if((g_async_req.retcode == 0) && (g_async_req.recvsize > 0))
-			{
-				fill_async(async_data, g_async_req.recvsize);
-				set_ayncreq(async_data, sizeof(async_data));
-			}
-		}
-
 		if(result & USB_EVENT_DETACH)
 		{
 			g_connected = 0;
+			retry_async = 0;
 			sceKernelClearEventFlag(g_mainevent, ~USB_EVENT_CONNECT);
 			DEBUG_PRINTF("USB Detach occurred\n");
+		}
+
+		if(result & USB_EVENT_ASYNC)
+		{
+			DEBUG_PRINTF("Async Request Done %d %d\n", g_async_req.retcode, g_async_req.recvsize);
+			if(g_connected)
+			{
+				if(g_async_req.retcode == -3)
+				{
+					/* -3 means cancelled, not a transient receive failure.
+					 * Wait for the normal USB attach/HELLO sequence. */
+					DEBUG_PRINTF("Async USB receive cancelled; awaiting reconnect\n");
+					g_connected = 0;
+					retry_async = 0;
+					sceKernelClearEventFlag(g_mainevent, ~USB_EVENT_CONNECT);
+				}
+				else
+				{
+					if(g_async_req.retcode == 0)
+					{
+						if((g_async_req.recvsize > 0) &&
+							(g_async_req.recvsize <= sizeof(async_data)))
+							fill_async(async_data, g_async_req.recvsize);
+						else if((g_async_req.recvsize < 0) ||
+							(g_async_req.recvsize > sizeof(async_data)))
+							MODPRINTF("Invalid async USB receive size %d\n",
+								g_async_req.recvsize);
+						/* A successful zero-length packet needs no delay. */
+					}
+					else
+					{
+						MODPRINTF("Async USB receive error %08X\n", g_async_req.retcode);
+						/* Requeue after a bounded event wait; do not block detach. */
+						retry_async = 1;
+					}
+
+					/* Do not queue new work on a disconnected USB bus. */
+					if(g_connected && (sceUsbGetState() & PSP_USB_CONNECTION_ESTABLISHED))
+					{
+						if(!retry_async && (set_ayncreq(async_data, sizeof(async_data)) < 0))
+						{
+							MODPRINTF("Could not restart async USB receive; retrying\n");
+							retry_async = 1;
+						}
+					}
+					else
+					{
+						retry_async = 0;
+						g_connected = 0;
+						sceKernelClearEventFlag(g_mainevent, ~USB_EVENT_CONNECT);
+					}
+				}
+			}
 		}
 
 		if(result & USB_EVENT_ATTACH)
 		{
 			uint32_t magic;
 			g_connected = 0;
+			retry_async = 0;
 			sceKernelClearEventFlag(g_mainevent, ~USB_EVENT_CONNECT);
 			DEBUG_PRINTF("USB Attach occurred\n");
 			if(read_data(&magic, sizeof(magic)) == sizeof(magic))
@@ -1058,9 +1123,11 @@ int usb_thread(SceSize size, void *argp)
 				{
 					if(send_hello_cmd())
 					{
-						set_ayncreq(async_data, sizeof(async_data));
-						g_connected = 1;
-						sceKernelSetEventFlag(g_mainevent, USB_EVENT_CONNECT);
+						if(set_ayncreq(async_data, sizeof(async_data)) >= 0)
+						{
+							g_connected = 1;
+							sceKernelSetEventFlag(g_mainevent, USB_EVENT_CONNECT);
+						}
 					}
 				}
 			}
@@ -1076,6 +1143,7 @@ int start_func(int size, void *p)
 	int ret;
 
 	DEBUG_PRINTF("Start Function %p\n", p);
+	g_connected = 0;
 
 	/* Fill in the descriptor tables */
 	memset(usbdata, 0, sizeof(usbdata));
@@ -1171,6 +1239,7 @@ int start_func(int size, void *p)
 int stop_func(int size, void *p)
 {
 	DEBUG_PRINTF("Stop function %p\n", p);
+	g_connected = 0;
 
 	if(g_thid >= 0)
 	{
@@ -1188,7 +1257,7 @@ int stop_func(int size, void *p)
 	if(g_transevent >= 0)
 	{
 		sceKernelDeleteEventFlag(g_transevent);
-		g_mainevent = -1;
+		g_transevent = -1;
 	}
 
 	if(g_asyncevent >= 0)
