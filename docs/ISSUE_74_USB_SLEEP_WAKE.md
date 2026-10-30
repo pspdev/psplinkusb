@@ -209,3 +209,36 @@ should distinguish maintenance wake from true application liveness failure,
 while preserving safe USB-handle lifetime synchronization.
 
 Local evidence: `~/Downloads/psplinkusb-issue74-wake-recovery-20261025/overnight-20261027/`.
+
+## Fourth confirmed hang: installed host without experimental wake recovery (2026-10-30)
+
+At **10:52 CET on October 30**, `pspsh` was unresponsive after a Mac
+sleep/DarkWake night. The running process was **PID 6771**, launched
+**October 29 at 12:36 CET**, up for about **22h 16m**, from the *installed*
+`/Users/fjtrujy/Projects/toolchains/psp/pspdev/bin/usbhostfs_pc /Users/fjtrujy`.
+This executable was last built **October 23** and does **not** support
+`-W`/`-T`; it was **not** the experimental recovery host used in the first
+two successful overnight tests. The PSP remained enumerated, with the original
+USB session **2941927314478** exclusively owned by PID 6771 and the shell
+TCP port 10000 listening. A bounded native-C test failed its **first** shell
+command without any output. Thread samples before and after the failed probe
+showed the host's main thread inside libusb's bulk-IN event poll and its async
+thread inside `select`, similar to earlier reproductions. macOS had experienced
+many maintenance DarkWake cycles. The installed host had no optional USB trace,
+so no endpoint-3 write status was available for this freeze.
+
+After collecting diagnostics, PID 6771 was stopped gracefully and the
+**non-injected experimental** branch daemon started as **PID 19610** with
+`-T -W -v` (without modifying the installed toolchain binary or the PSP).
+The host and PSP USB reconnected under session **3738831471722**. Both **12/12**
+and **120/120** subsequent real-PSP shell/HostFS operations passed (120:
+3.00 s, p95 55 ms, max 56 ms). The console did not need a reboot or cable
+reconnection. This demonstrates recovery after host reconnection, but it does
+*not* establish which internal USB endpoint stalled or that `-W` alone would
+prevent every hang.
+
+The pending PSP-side async lifecycle PR **#76** was not merged or installed
+at the time of this reproduction and is not implicated by this result.
+The experimental wake-recovery daemon was left running for another soak.
+
+Evidence is under `~/Downloads/psplinkusb-issue74-freeze4-20261030/`.
