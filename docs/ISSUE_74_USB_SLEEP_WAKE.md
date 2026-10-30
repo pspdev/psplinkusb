@@ -242,3 +242,48 @@ at the time of this reproduction and is not implicated by this result.
 The experimental wake-recovery daemon was left running for another soak.
 
 Evidence is under `~/Downloads/psplinkusb-issue74-freeze4-20261030/`.
+
+## Fifth incident: PSP USB disappears entirely despite `-W` (2026-10-30)
+
+At **23:38 CET on October 30**, the reporter again observed an unresponsive
+`pspsh`. Unlike the October 30 morning recurrence, this time the
+**non-injected experimental `-T -W -v`** host was running as the same
+**PID 19610**, started October 30 at 10:54 and up for **12h 44m**. The host
+still listened on TCP 10000–10002, but the PSP's USB device was **absent from
+macOS IOUSB/IORegistry**, and its USB interface was no longer owned by the
+host. The native C hardware probe failed the first `pspsh` echo command.
+
+The full host trace stopped at **13:12:52 CET** with:
+
+```
+[USB trace 2026-10-30 13:12:50] async channel=0: submitted 14 bytes, transferred=14
+[USB trace 2026-10-30 13:12:51] async channel=0: submitted 14 bytes, transferred=14
+[USB trace 2026-10-30 13:12:52] bulk-IN error=-1 (LIBUSB_ERROR_IO); reconnecting
+[USB trace 2026-10-30 13:12:52] closing USB device handle; reconnect requested
+waiting for device...
+```
+
+Two previous bulk-IN `LIBUSB_ERROR_IO` reconnects at **10:55:44** and
+**12:34:26** successfully returned to `Connected to device`, but the third
+did not. **Zero** wake-triggered reconnects and **zero** async write errors
+were recorded in this host session. Subsequent power-management DarkWake
+periods began at 22:23; they happened *after* the USB device had disappeared.
+
+A thread sample confirmed the main thread was in `wait_for_device()` sleeping
+and polling libusb's device list; the async server thread was in `select`.
+Thus this is **not** a host socket deadlock and not the earlier silent
+`pspsh` failure with a still-enumerated PSP. The `-W` detector is called only
+after `wait_for_device()` succeeds: it cannot re-enumerate a USB device that
+macOS no longer sees. The host's normal error-close path does call
+`libusb_reset_device` via `close_device()`. **We do not yet know** whether
+that reset caused the missing USB device, whether the PSP powered down or
+stopped its USB driver, or whether the cable/port experienced a physical
+transport disconnect. Do not conclude causation from the trace alone.
+
+No device restart, cable intervention or host restart was performed before
+capturing this state. Evidence: `~/Downloads/psplinkusb-issue74-freeze5-20261030/`.
+The next required observation is whether the physical PSP is still powered
+on and displaying PSPLinkUSB, before attempting a cable reconnect or driver
+restart. A future diagnostic could record the reset return code and exact
+USB disappearance/re-enumeration timing and should not unconditionally
+reset the device on every generic read error without characterizing it.
