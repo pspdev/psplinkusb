@@ -287,3 +287,35 @@ on and displaying PSPLinkUSB, before attempting a cable reconnect or driver
 restart. A future diagnostic could record the reset return code and exact
 USB disappearance/re-enumeration timing and should not unconditionally
 reset the device on every generic read error without characterizing it.
+
+## November 2 overnight: active PSP session passes physical smoke test
+
+At **11:48 CET on November 2**, the reporter confirmed PSPLinkUSB stayed
+usable overnight. Independently verified the **same recovery-enabled host
+process PID 19610** launched October 30 at 10:54:09 CET is still running
+(approximately **72h 55m process uptime**). Note: the PSP was explicitly
+reported *not connected* during an intervening October 31 diagnostic check;
+**process uptime does not imply 73 hours of uninterrupted physical USB
+connection**. On November 2, the PSP is enumerated again (USB session
+**7663608746750**) and the host's TCP socket listeners are active.
+
+Native-C PSP shell/HostFS test passed **120/120 commands** in **6.50s**
+(p95 **70ms**, max **72ms**), with no daemon restart, PSP reset, or cable
+intervention during verification. The existing host trace contains **30**
+wake-triggered coordinated USB resets (all November 2), **11** bulk-IN
+`LIBUSB_ERROR_IO` read failures over the host process's lifetime, and
+**zero** async endpoint-3 transfer failure messages; 42 successful device
+connection messages. Most wake-triggered reconnects match Mac
+sleep/DarkWake cycles, and the trace still reveals a high rate of potentially
+unnecessary USB resets. The last recorded bulk-IN errors occurred November 1;
+none were recorded during the later November 2 wake-reset sequence.
+
+Interpretation: this confirms an **overnight success with the PSP actually
+connected and responding at the end**. It strengthens the case for the
+experimental opt-in `-W` workaround without proving the long-idle root cause
+has been eliminated. Keep issue #74 open; reduce automatic reset frequency
+and add a non-destructive PSP liveness signal before proposing production
+default behavior. The PSP-side async lifecycle PR #76 remains separate and
+unmerged.
+
+Diagnostics: `~/Downloads/psplinkusb-issue74-overnight-20261102/`.
