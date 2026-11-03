@@ -1,7 +1,7 @@
 OUTPUT=sersh
 OBJS=sersh.o
 
-CFLAGS=-Wall -g 
+CFLAGS=-Wall -Werror -g
 LIBS=
 
 all: sersh

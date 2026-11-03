@@ -411,7 +411,7 @@ static void handle_query(struct PsplinkContext *ctx, char *str)
 
 						  text = g_context.info.text_addr;
 
-						  sprintf(output, "Text=%08X;Data=%08X;Bss=%08X", text, text, text);
+						  sprintf(output, "Text=%08lX;Data=%08lX;Bss=%08lX", text, text, text);
 					  }
 				  }
 				  break;

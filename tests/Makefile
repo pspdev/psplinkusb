@@ -1,5 +1,5 @@
 CC ?= cc
-HOST_CFLAGS = -g -O1 -DPC_SIDE -D_FILE_OFFSET_BITS=64 -I../usbhostfs -I../usbhostfs_pc $(shell pkg-config --cflags libusb-1.0)
+HOST_CFLAGS = -Wall -Werror -g -O1 -DPC_SIDE -D_FILE_OFFSET_BITS=64 -I../usbhostfs -I../usbhostfs_pc $(shell pkg-config --cflags libusb-1.0)
 HOST_LIBS = -lpthread $(shell pkg-config --libs libusb-1.0)
 
 .PHONY: test

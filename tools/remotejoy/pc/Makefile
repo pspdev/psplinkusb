@@ -1,7 +1,7 @@
 OUTPUT=remotejoy
 OBJS=remotejoy.o
 
-CFLAGS=-Wall -g
+CFLAGS=-Wall -Werror -g
 
 PREFIX=$(shell psp-config --pspdev-path 2> /dev/null)
 

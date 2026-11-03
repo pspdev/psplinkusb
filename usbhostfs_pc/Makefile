@@ -1,7 +1,7 @@
 OUTPUT=usbhostfs_pc
 OBJS=main.o
 LIBS=-lpthread $(shell pkg-config --libs libusb-1.0)
-CFLAGS=-Wall -ggdb -I../usbhostfs -DPC_SIDE -D_FILE_OFFSET_BITS=64 -I. -O2 $(shell pkg-config --cflags libusb-1.0)
+CFLAGS=-Wall -Werror -ggdb -I../usbhostfs -DPC_SIDE -D_FILE_OFFSET_BITS=64 -I. -O2 $(shell pkg-config --cflags libusb-1.0)
 LDFLAGS=
 
 PREFIX=$(shell psp-config --pspdev-path 2> /dev/null)
