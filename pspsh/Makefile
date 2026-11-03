@@ -1,3 +1,5 @@
+WERROR ?= $(if $(filter true 1,$(CI)),1,0)
+
 OUTPUT=pspsh
 OBJS=pspsh.o parse_args.o pspkerror.o asm.o disasm.o
 
@@ -7,7 +9,7 @@ else
    CXXFLAGS	+= -O3
 endif
 
-CXXFLAGS+= -Wall -D_PCTERM -I../psplink
+CXXFLAGS+= -Wall $(if $(filter 1,$(WERROR)),-Werror) -D_PCTERM -I../psplink
 LIBS=-lreadline
 
 PREFIX=$(shell psp-config --pspdev-path 2> /dev/null)

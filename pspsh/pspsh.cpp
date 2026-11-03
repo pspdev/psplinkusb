@@ -510,7 +510,7 @@ int asm_cmd(int argc, char **argv)
 			unsigned int opcode;
 			if(asmAssemble(argv[i], 0, &opcode) == 0)
 			{
-				sprintf(curr, "0x%08X ", opcode);
+				snprintf(curr, sizeof(cmd) - (curr - cmd), "0x%08X ", opcode);
 				curr += strlen(curr);
 			}
 			else
@@ -569,7 +569,7 @@ void cli_handler(char *buf)
 
 				g_context.ttymode = 0;
 				rl_callback_handler_remove();
-				snprintf(prompt, PATH_MAX, "%s> ", g_context.currpath);
+				snprintf(prompt, sizeof(prompt), "%.*s> ", (int)(sizeof(prompt) - 3), g_context.currpath);
 				rl_callback_handler_install(prompt, cli_handler);
 			}
 			else if(g_context.outsock >= 0)
@@ -596,7 +596,7 @@ void cli_handler(char *buf)
 				g_context.asmmode = 0;
 				g_context.asmaddr = 0;
 				rl_callback_handler_remove();
-				snprintf(prompt, PATH_MAX, "%s> ", g_context.currpath);
+				snprintf(prompt, sizeof(prompt), "%.*s> ", (int)(sizeof(prompt) - 3), g_context.currpath);
 				rl_callback_handler_install(prompt, cli_handler);
 			}
 			return;
@@ -620,7 +620,7 @@ void cli_handler(char *buf)
 			unsigned int opcode;
 			if(asmAssemble(buf, g_context.asmaddr, &opcode) == 0)
 			{
-				sprintf(cmd, "pokew 0x%08X 0x%08X ", g_context.asmaddr, opcode);
+				snprintf(cmd, sizeof(cmd), "pokew 0x%08X 0x%08X ", g_context.asmaddr, opcode);
 				execute_line(cmd);
 			}
 
@@ -830,7 +830,8 @@ char *filename_gen(const char *text, int state)
 		name = (char*) malloc(strlen(dirpath) + strlen(pEntry->name) + 1);
 		if(name)
 		{
-			sprintf(name, "%s%s", dirpath, pEntry->name);
+			snprintf(name, strlen(dirpath) + strlen(pEntry->name) + 1,
+				"%s%s", dirpath, pEntry->name);
 		}
 		pNext = pEntry->pNext;
 		free(pEntry->name);
@@ -888,7 +889,7 @@ char *uid_gen(const char *text, int state)
 		name = (char*) malloc(strlen(pEntry->name) + 1);
 		if(name)
 		{
-			sprintf(name, "%s", pEntry->name);
+			snprintf(name, strlen(pEntry->name) + 1, "%s", pEntry->name);
 		}
 		pNext = pEntry->pNext;
 		free(pEntry->name);
@@ -964,6 +965,8 @@ char** shell_completion(const char *text, int start, int end)
 
 int init_readline(void)
 {
+	static char basic_word_breaks[] = "\t\n ";
+	static char completer_word_breaks[] = "\t\n ";
 #if RL_READLINE_VERSION >= 0x500
 	rl_bind_key_in_map(META('r'), cli_reset, emacs_standard_keymap);
 	rl_bind_key_in_map(META('s'), cli_step, emacs_standard_keymap);
@@ -971,8 +974,8 @@ int init_readline(void)
 #endif
 	rl_attempted_completion_function = shell_completion;
 	rl_callback_handler_install("", cli_handler);
-	rl_basic_word_break_characters = "\t\n ";
-	rl_completer_word_break_characters = "\t\n ";
+	rl_basic_word_break_characters = basic_word_breaks;
+	rl_completer_word_break_characters = completer_word_breaks;
 
 	return 1;
 }
@@ -1445,7 +1448,7 @@ int process_cmd(const unsigned char *str)
 				}
 				else
 				{
-					snprintf(prompt, PATH_MAX, "%s> ", g_context.currpath);
+					snprintf(prompt, sizeof(prompt), "%.*s> ", (int)(sizeof(prompt) - 3), g_context.currpath);
 					g_context.ttymode = 0;
 				}
 				rl_callback_handler_install(prompt, cli_handler);

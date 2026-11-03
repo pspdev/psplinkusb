@@ -1,3 +1,5 @@
+WERROR ?= $(if $(filter true 1,$(CI)),1,0)
+
 TARGET=libusbhostfs_driver.a
 all: $(TARGET)
 OBJS = USBHostFS_driver_0000.o USBHostFS_driver_0001.o USBHostFS_driver_0002.o USBHostFS_driver_0003.o USBHostFS_driver_0004.o USBHostFS_driver_0005.o USBHostFS_driver_0006.o USBHostFS_driver_0007.o USBHostFS_driver_0008.o USBHostFS_driver_0009.o USBHostFS_driver_0010.o 
@@ -9,7 +11,7 @@ clean:
 
 CC=psp-gcc
 INCDIR = 
-CFLAGS = -Os -mno-gpopt -Wall -fno-builtin-printf -I$(PSPSDK)/include
+CFLAGS = -Os -mno-gpopt -Wall $(if $(filter 1,$(WERROR)),-Werror) -fno-builtin-printf -I$(PSPSDK)/include
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS = $(CFLAGS)
 LDFLAGS=-nodefaultlibs
@@ -23,4 +25,3 @@ $(TARGET): $(OBJS)
 
 $(OBJS): USBHostFS_driver.S
 	$(CC) $(CFLAGS) -DF_$* $< -c -o $@
-

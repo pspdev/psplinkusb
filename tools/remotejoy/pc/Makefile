@@ -1,7 +1,9 @@
+WERROR ?= $(if $(filter true 1,$(CI)),1,0)
+
 OUTPUT=remotejoy
 OBJS=remotejoy.o
 
-CFLAGS=-Wall -g
+CFLAGS=-Wall $(if $(filter 1,$(WERROR)),-Werror) -g
 
 PREFIX=$(shell psp-config --pspdev-path 2> /dev/null)
 

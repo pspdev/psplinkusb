@@ -1,3 +1,5 @@
+WERROR ?= $(if $(filter true 1,$(CI)),1,0)
+
 TARGET=libpsplink_driver.a
 all: $(TARGET)
 OBJS = psplink_driver_0000.o psplink_driver_0001.o psplink_driver_0002.o psplink_driver_0003.o psplink_driver_0004.o psplink_driver_0005.o psplink_driver_0006.o psplink_driver_0007.o psplink_driver_0008.o psplink_driver_0009.o psplink_driver_0010.o psplink_driver_0011.o psplink_driver_0012.o psplink_driver_0013.o psplink_driver_0014.o psplink_driver_0015.o psplink_driver_0016.o psplink_driver_0017.o psplink_driver_0018.o 
@@ -9,7 +11,7 @@ clean:
 
 CC=psp-gcc
 INCDIR = 
-CFLAGS = -Os -mno-gpopt -Wall -fno-builtin-printf -I$(PSPSDK)/include
+CFLAGS = -Os -mno-gpopt -Wall $(if $(filter 1,$(WERROR)),-Werror) -fno-builtin-printf -I$(PSPSDK)/include
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS = $(CFLAGS)
 LDFLAGS=-nodefaultlibs
@@ -23,4 +25,3 @@ $(TARGET): $(OBJS)
 
 $(OBJS): psplink_driver.S
 	$(CC) $(CFLAGS) -DF_$* $< -c -o $@
-
