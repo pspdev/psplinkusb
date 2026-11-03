@@ -9,7 +9,7 @@ clean:
 
 CC=psp-gcc
 INCDIR = 
-CFLAGS = -Os -mno-gpopt -Wall -fno-builtin-printf -I$(PSPSDK)/include
+CFLAGS = -Os -mno-gpopt -Wall -Werror -fno-builtin-printf -I$(PSPSDK)/include
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS = $(CFLAGS)
 LDFLAGS=-nodefaultlibs
@@ -23,4 +23,3 @@ $(TARGET): $(OBJS)
 
 $(OBJS): USBHostFS.S
 	$(CC) $(CFLAGS) -DF_$* $< -c -o $@
-

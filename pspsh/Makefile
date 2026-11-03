@@ -7,7 +7,7 @@ else
    CXXFLAGS	+= -O3
 endif
 
-CXXFLAGS+= -Wall -D_PCTERM -I../psplink
+CXXFLAGS+= -Wall -Werror -D_PCTERM -I../psplink
 LIBS=-lreadline
 
 PREFIX=$(shell psp-config --pspdev-path 2> /dev/null)

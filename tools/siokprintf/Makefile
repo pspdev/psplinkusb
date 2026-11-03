@@ -5,7 +5,7 @@ OBJS = main.o
 USE_KERNEL_LIBS = 1
 
 INCDIR = 
-CFLAGS = -Os -mno-gpopt -Wall -fno-builtin-printf
+CFLAGS = -Os -mno-gpopt -Wall -Werror -fno-builtin-printf
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS = $(CFLAGS)
 

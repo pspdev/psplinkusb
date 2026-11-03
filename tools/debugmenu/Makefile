@@ -6,7 +6,7 @@ USE_KERNEL_LIBS = 1
 
 INCDIR = 
 LDFLAGS = -L../../libpsplink
-CFLAGS = -Os -mno-gpopt -Wall -fno-builtin-printf -I../../usbhostfs -I../../psplink
+CFLAGS = -Os -mno-gpopt -Wall -Werror -fno-builtin-printf -I../../usbhostfs -I../../psplink
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS = $(CFLAGS)
 

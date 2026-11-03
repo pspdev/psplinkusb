@@ -1,7 +1,7 @@
 OUTPUT=remotejoy
 OBJS=remotejoy.o font.o
 
-CFLAGS=-O2 -Wall -g $(shell sdl-config --cflags)
+CFLAGS=-O2 -Wall -Werror -g $(shell sdl-config --cflags)
 
 PREFIX=$(shell psp-config --pspdev-path 2> /dev/null)
 

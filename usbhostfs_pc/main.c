@@ -261,11 +261,29 @@ int configure_usb(libusb_device_handle *devh) {
 	return 0;
 }
 
+#ifndef NO_UID_CHECK
+/* Restore both IDs even if one operation fails.  Never continue running
+ * with unintentionally elevated privileges after a failed restoration. */
+static void restore_user_identity(void)
+{
+	int gid_result = setegid(getgid());
+	int uid_result = seteuid(getuid());
+
+	if(gid_result < 0 || uid_result < 0)
+	{
+		fprintf(stderr, "Cannot restore user privileges: %s\n", strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+}
+#endif
+
 libusb_device_handle *open_device(libusb_device *usbdev)
 {
 	libusb_device_handle *ret = NULL;
 
+	#ifndef NO_UID_CHECK
 	int escalated = 0;
+	#endif
 	int r = libusb_open(usbdev, &ret);
 	if (r == LIBUSB_ERROR_ACCESS) {
 		/* We do not seem to have permissions, try elevating privileges (if sbit is set) */
@@ -279,8 +297,7 @@ libusb_device_handle *open_device(libusb_device *usbdev)
 				fprintf(stderr, "  On Linux you mgiht need to install a udev config file (50-psplink.rules)\n");
 				fprintf(stderr, "  You can also set the `setuid` bit on the binary alternatively\n");
 
-				seteuid(getuid());
-				setegid(getgid());
+				restore_user_identity();
 				return NULL;
 			}
 			escalated = 1;
@@ -304,8 +321,7 @@ libusb_device_handle *open_device(libusb_device *usbdev)
 
 	#ifndef NO_UID_CHECK
 		if (escalated) {
-			seteuid(getuid());
-			setegid(getgid());
+			restore_user_identity();
 		}
 	#endif
 	return ret;
@@ -1707,7 +1723,6 @@ int handle_rename(libusb_device_handle *dev, struct HostFsRenameCmd *cmd, int cm
 	char newpath[PATH_MAX];
 	char destpath[PATH_MAX];
 	int  oldpathlen;
-	int  newpathlen;
 
 	memset(&resp, 0, sizeof(resp));
 	resp.cmd.magic = LE32(HOSTFS_MAGIC);
@@ -1740,7 +1755,6 @@ int handle_rename(libusb_device_handle *dev, struct HostFsRenameCmd *cmd, int cm
 
 		/* Really should check this better ;) */
 		oldpathlen = strlen(path);
-		newpathlen = strlen(path+oldpathlen+1);
 
 		/* If the old path is absolute and the new path is relative then rebase newpath */
 		if((*path == '/') && (*(path+oldpathlen+1) != '/'))
@@ -2210,7 +2224,9 @@ void do_async(struct AsyncCommand *cmd, int readlen)
 		unsigned int chan = LE32(cmd->channel);
 		if((chan < MAX_ASYNC_CHANNELS) && (g_clientsocks[chan] >= 0))
 		{
-			write(g_clientsocks[chan], data, readlen - sizeof(struct AsyncCommand));
+			int size = readlen - (int)sizeof(struct AsyncCommand);
+			if(fixed_write(g_clientsocks[chan], data, size) != size)
+				fprintf(stderr, "Could not forward all async USB data to channel %u\n", chan);
 			if((chan == ASYNC_GDB) && (g_gdbdebug))
 			{
 				print_gdbdebug(0, data, readlen - sizeof(struct AsyncCommand));
@@ -2344,11 +2360,26 @@ int start_hostfs(void)
 	return 0;
 }
 
+/* Construct a path without silently truncating it or overflowing PATH_MAX. */
+static int join_drive_path(char *dest, size_t capacity, const char *root, const char *child)
+{
+	size_t rootlen = strlen(root);
+	size_t childlen = strlen(child);
+
+	if(rootlen >= capacity || childlen >= capacity - rootlen - 1)
+		return -1;
+
+	memcpy(dest, root, rootlen);
+	dest[rootlen] = '/';
+	memcpy(dest + rootlen + 1, child, childlen + 1);
+	return 0;
+}
+
 int parse_args(int argc, char **argv)
 {
 	int i;
 
-	if(getcwd(g_rootdir, PATH_MAX) < 0)
+	if(getcwd(g_rootdir, PATH_MAX) == NULL)
 	{
 		fprintf(stderr, "Could not get current path\n");
 		return 0;
@@ -2413,11 +2444,20 @@ int parse_args(int argc, char **argv)
 			if(argv[i][0] != '/')
 			{
 				char tmpdir[PATH_MAX];
-				snprintf(tmpdir, sizeof(tmpdir), "%s/%s", g_rootdir, argv[i]);
+				if(join_drive_path(tmpdir, sizeof(tmpdir), g_rootdir, argv[i]) < 0)
+				{
+					fprintf(stderr, "HostFS root path is too long: %s\n", argv[i]);
+					return 0;
+				}
 				strcpy(g_drives[i].rootdir, tmpdir);
 			}
 			else
 			{
+				if(strlen(argv[i]) >= sizeof(g_drives[i].rootdir))
+				{
+					fprintf(stderr, "HostFS root path is too long: %s\n", argv[i]);
+					return 0;
+				}
 				strcpy(g_drives[i].rootdir, argv[i]);
 			}
 			gen_path(g_drives[i].rootdir, 0);
@@ -2547,10 +2587,19 @@ int add_drive(int num, const char *dir)
 	/* Make path */
 	if(dir[0] != '/')
 	{
-		snprintf(path, PATH_MAX, "%s/%s", g_rootdir, dir);
+		if(join_drive_path(path, sizeof(path), g_rootdir, dir) < 0)
+		{
+			printf("HostFS mount path is too long\n");
+			return 0;
+		}
 	}
 	else
 	{
+		if(strlen(dir) >= sizeof(path))
+		{
+			printf("HostFS mount path is too long\n");
+			return 0;
+		}
 		strcpy(path, dir);
 	}
 	gen_path(path, 0);
@@ -2756,19 +2805,19 @@ void load_mapfile(const char *mapfile)
 		line++;
 		/* Remove whitespace */
 		len = strlen(buf);
-		while((len > 0) && (isspace(buf[len-1])))
+		while((len > 0) && (isspace((unsigned char)buf[len-1])))
 		{
 			buf[len-1] = 0;
 			len--;
 		}
 
-		while(isspace(*buf))
+		while(isspace((unsigned char)*buf))
 		{
 			buf++;
 			len--;
 		}
 
-		if(!isdigit(*buf))
+		if(!isdigit((unsigned char)*buf))
 		{
 			printf("Line %d: Entry does not start with the host number\n", line);
 			continue;
@@ -2778,7 +2827,7 @@ void load_mapfile(const char *mapfile)
 		{
 			char *endp;
 			num = strtoul(buf, &endp, 10);
-			if((*endp != '=') || (*(endp+1) == 0) || (isspace(*(endp+1))))
+			if((*endp != '=') || (*(endp+1) == 0) || (isspace((unsigned char)*(endp+1))))
 			{
 				printf("Line %d: Entry is not of the form 'num=path'\n", line);
 				continue;
@@ -2859,7 +2908,11 @@ int ch_dir(void)
 
 	if(chdir(dir) == 0)
 	{
-		getcwd(g_rootdir, PATH_MAX);
+		if(getcwd(g_rootdir, PATH_MAX) == NULL)
+		{
+			perror("getcwd");
+			return COMMAND_ERR;
+		}
 	}
 	else
 	{
@@ -2905,13 +2958,13 @@ void parse_shell(char *buf)
 #endif
 		/* Remove whitespace */
 		len = strlen(buf);
-		while((len > 0) && (isspace(buf[len-1])))
+		while((len > 0) && (isspace((unsigned char)buf[len-1])))
 		{
 			buf[len-1] = 0;
 			len--;
 		}
 
-		while(isspace(*buf))
+		while(isspace((unsigned char)*buf))
 		{
 			buf++;
 			len--;
@@ -2921,7 +2974,8 @@ void parse_shell(char *buf)
 		{
 			if(*buf == '!')
 			{
-				system(buf+1);
+				if(system(buf+1) == -1)
+					perror("system");
 			}
 			else
 			{

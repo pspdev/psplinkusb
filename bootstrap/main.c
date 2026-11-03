@@ -84,4 +84,7 @@ int module_start(SceSize args, void *argp)
 void _exit(int status)
 {
 	sceKernelExitGame();
+	/* _exit is declared noreturn by newlib; do not return if exit fails. */
+	for(;;)
+		sceKernelSleepThread();
 }
