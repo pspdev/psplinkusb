@@ -3146,6 +3146,26 @@ int main(int argc, char **argv)
 		signal(SIGINT, signal_handler);
 		signal(SIGTERM, signal_handler);
 
+		/* Bind the channel ports before daemonising so a failure still reaches
+		 * the terminal. Without them no client (pspsh, remotejoy, ...) can
+		 * connect, so running on would only look like it works. */
+		for(i = 0; i < MAX_ASYNC_CHANNELS; i++)
+		{
+			g_servsocks[i] = make_socket(g_baseport + i);
+			g_clientsocks[i] = -1;
+			if(g_servsocks[i] < 0)
+			{
+				fprintf(stderr, "Could not listen on port %d. Is another usbhostfs_pc "
+						"running? Use -b to pick another base port.\n", g_baseport + i);
+				while(--i >= 0)
+				{
+					close(g_servsocks[i]);
+				}
+				libusb_exit(usbctx);
+				return 1;
+			}
+		}
+
 		if(g_daemon)
 		{
 			pid_t pid = fork();
@@ -3173,12 +3193,6 @@ int main(int argc, char **argv)
 		if(g_mapfile)
 		{
 			load_mapfile(g_mapfile);
-		}
-
-		for(i = 0; i < MAX_ASYNC_CHANNELS; i++)
-		{
-			g_servsocks[i] = make_socket(g_baseport + i);
-			g_clientsocks[i] = -1;
 		}
 
 		pthread_create(&thid, NULL, async_thread, NULL);
