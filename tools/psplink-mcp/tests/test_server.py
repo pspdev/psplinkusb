@@ -6,7 +6,7 @@ from PIL import Image
 
 from psplink_mcp import joy
 from psplink_mcp.channels import Ports
-from psplink_mcp.server import PSP, build_server
+from psplink_mcp.server import INPUT_SETTLE_S, PSP, build_server
 
 from .fake_usbhostfs import FakePSP
 
@@ -153,6 +153,25 @@ async def test_tool_schema_keeps_parameters(rig):
     tools = {t.name: t for t in await build_server(psp).list_tools()}
     assert set(tools["psp_press"].input_schema["properties"]) == {"buttons", "hold_ms"}
     assert tools["psp_press"].input_schema["required"] == ["buttons"]
+
+
+@pytest.mark.parametrize("tool,args", [
+    ("psp_press", {"buttons": ["cross"], "hold_ms": 1}),
+    ("psp_buttons", {"down": ["cross"]}),
+    ("psp_analog", {"x": 10, "y": 20, "duration_ms": 0}),
+    ("psp_input_sequence", {"steps": [{"press": ["up"], "hold_ms": 1}]}),
+])
+async def test_input_tools_settle_before_returning(rig, tool, args):
+    # Input and screenshots use different channels, so an input tool must give
+    # the PSP time to apply its last event before a following screenshot.
+    fake, psp, _ = rig
+    server = build_server(psp)
+    await psp.ensure_remotejoy()
+    loop = asyncio.get_running_loop()
+    start = loop.time()
+    await server.call_tool(tool, args)
+    assert loop.time() - start >= INPUT_SETTLE_S
+    assert fake.joy_events  # the events reached the PSP side before we returned
 
 
 async def test_expected_errors_reach_the_model(rig):

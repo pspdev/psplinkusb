@@ -42,6 +42,11 @@ LOAD_ERROR_HINTS = {
     0x80010002: "File not found on the PSP side. Check that the path is inside the usbhostfs_pc root.",
 }
 
+# Input travels on the joy channel and screenshots on the shell channel, so a
+# screenshot taken right after an input tool can reach the PSP first and show
+# the previous frame. Input tools wait this long before returning: enough for
+# the USB hop, the RemoteJoy thread and about three frames at 60 Hz.
+INPUT_SETTLE_S = 0.05
 
 
 class PSP:
@@ -343,6 +348,7 @@ def build_server(psp: PSP) -> MCPServer:
         ltrigger, rtrigger, start, select. HOME and NOTE are not supported.
         """
         await psp.press(buttons, hold_ms)
+        await asyncio.sleep(INPUT_SETTLE_S)
         return f"pressed {'+'.join(buttons)} for {hold_ms} ms"
 
     @mcp.tool()
@@ -353,6 +359,7 @@ def build_server(psp: PSP) -> MCPServer:
             await psp.send_joy(joy.buttons_event(True, joy.button_mask(down)))
         if up:
             await psp.send_joy(joy.buttons_event(False, joy.button_mask(up)))
+        await asyncio.sleep(INPUT_SETTLE_S)
         return f"down={down or []} up={up or []}"
 
     @mcp.tool()
@@ -363,6 +370,7 @@ def build_server(psp: PSP) -> MCPServer:
         After duration_ms the stick is recentred; pass 0 to leave it where it is.
         """
         await psp.analog(x, y, duration_ms)
+        await asyncio.sleep(INPUT_SETTLE_S)
         return f"analog ({x}, {y}) for {duration_ms} ms"
 
     @mcp.tool()
@@ -385,6 +393,7 @@ def build_server(psp: PSP) -> MCPServer:
                 await psp.analog(int(x), int(y), int(step.get("duration_ms", 300)))
             else:
                 raise ValueError(f"step {i}: expected 'press', 'wait_ms' or 'analog', got {step}")
+        await asyncio.sleep(INPUT_SETTLE_S)
         return f"ran {len(steps)} steps"
 
     @mcp.tool()
