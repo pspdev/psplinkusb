@@ -124,9 +124,13 @@ class FakePSP:
             if path.endswith("remotejoy.prx"):
                 local = self.root / path.removeprefix("host0:/")
                 if not local.exists():
-                    await self._reply(f"Failed to Load/Start module '{path}' Error: 0x80010002\n", ok=False)
+                    # Like PSPLink's ldstart_cmd: SUCCESS frame, negative SceUID.
+                    await self._reply(f"Failed to Load/Start module '{path}' Error: 0x80010002\n", ret=0x80010002)
                     return
                 self.remotejoy_loaded = True
+            if path.endswith("static.elf"):
+                await self._reply(f"Failed to Load/Start module '{path}' Error: 0x80020148\n", ret=0x80020148)
+                return
             await self._reply(f"Load/Start {path} UID: 0x04A0F2B3 Name: app\n", ret=0x04A0F2B3)
             await self._send("stdout", f"hello from {path} args={args[1:]}\n".encode())
             if "crash" in path:

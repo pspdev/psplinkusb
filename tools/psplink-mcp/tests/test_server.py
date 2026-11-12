@@ -50,6 +50,25 @@ async def test_run_collects_stdout_and_exceptions(rig):
     assert "Bus error" in res["shell"]
 
 
+async def test_run_reports_failed_load(rig):
+    # PSPLink answers SUCCESS for a failed ld; the negative SceUID is the failure.
+    fake, psp, _ = rig
+    res = await psp.run_app("app/static.elf", [], wait_s=5)
+    assert res["load"]["ok"] is False
+    assert res["load"]["ret"] == "0x80020148"
+    assert "PRX" in res["load"]["hint"]
+
+
+async def test_failed_remotejoy_load_is_an_error(rig):
+    fake, psp, root = rig
+    psp.remotejoy = root / "missing" / "remotejoy.prx"  # nothing to copy
+    (root / ".psplink-mcp").mkdir()
+    (root / ".psplink-mcp" / "remotejoy.prx").write_bytes(b"x")
+    fake.root = root / "elsewhere"  # the PSP side can't find the file
+    with pytest.raises(RuntimeError, match="0x80010002"):
+        await psp.press(["start"], hold_ms=1)
+
+
 def test_host_path(tmp_path):
     psp = PSP("127.0.0.1", Ports.from_base(), tmp_path)
     assert psp.host_path("app.prx") == "host0:/app.prx"

@@ -73,6 +73,10 @@ Then ask Claude to "check the PSP status". It should report the PSPLink version.
 - remotejoy can't send HOME/NOTE/volume/screen keys and doesn't support the latch
   functions (`sceCtrlReadLatch`). Apps that read input only through latches won't see presses.
 - To run an app again, call `psp_reset` first, the same as with pspsh.
+- `psp_run` loads modules with `sceKernelLoadModule`, so it can't run an `EBOOT.PBP`,
+  and on 6.xx firmware it can't run a static ELF either (`0x80020148`). Build the app as
+  a PRX (`BUILD_PRX=1` in a Makefile, or `-DBUILD_PRX=ON` / `BUILD_PRX` in
+  `create_pbp_file` with CMake) and run the `.prx`.
 
 ## Development
 

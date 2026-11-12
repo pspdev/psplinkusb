@@ -33,6 +33,16 @@ DRIVE_PREFIXES = ("host", "ms0:", "ef0:", "flash", "disc0:", "umd")
 # Built by `make -C tools/remotejoy` in this repository.
 BUNDLED_REMOTEJOY = Path(__file__).resolve().parents[3] / "remotejoy" / "remotejoy.prx"
 
+LOAD_ERROR_HINTS = {
+    0x80020148: (
+        "SCE_KERNEL_ERROR_UNSUPPORTED_PRX_TYPE: this is probably a static (EXEC) ELF. "
+        "Firmware 6.xx only loads PRX modules this way, so build the app as a PRX "
+        "(BUILD_PRX=1, or BUILD_PRX in create_pbp_file) and run that file."
+    ),
+    0x80010002: "File not found on the PSP side. Check that the path is inside the usbhostfs_pc root.",
+}
+
+
 
 class PSP:
     """Connection state and operations; the MCP tools are thin wrappers."""
@@ -138,9 +148,22 @@ class PSP:
     async def run_app(self, path: str, args: list[str], wait_s: float) -> dict[str, Any]:
         target = self.host_path(path)
         self.take_output(clear=True)
-        res = await self.run_shell(" ".join(shlex.quote(a) for a in ["ld", target, *args]), timeout=15)
-        await asyncio.sleep(wait_s)
-        return {"load": _result_dict(res), **self.take_output(clear=True)}
+        res = await self.load_module(" ".join(shlex.quote(a) for a in [target, *args]))
+        if res.ok:
+            await asyncio.sleep(wait_s)
+        load = _result_dict(res)
+        if not res.ok and res.ret in LOAD_ERROR_HINTS:
+            load["hint"] = LOAD_ERROR_HINTS[res.ret]
+        return {"load": load, **self.take_output(clear=True)}
+
+    async def load_module(self, path_and_args: str) -> ShellResult:
+        """Run `ld` (PSPLink's ldstart). It answers SUCCESS even when the load
+        fails and puts the negative SceUID in the return value (psplink/shell.c
+        ldstart_cmd), so a negative return value is a failure too."""
+        res = await self.run_shell(f"ld {path_and_args}", timeout=15)
+        if res.ok and res.ret is not None and res.ret & 0x80000000:
+            res.ok = False
+        return res
 
     async def screenshot(self, scale: float, pri: int) -> bytes:
         if self.root is None:
@@ -180,7 +203,7 @@ class PSP:
             raise FileNotFoundError(
                 f"remotejoy.prx not found. Build it with `make -C tools/remotejoy` or copy it to {dest}"
             )
-        res = await self.run_shell(f"ld host0:/{WORK_DIR}/remotejoy.prx", timeout=10)
+        res = await self.load_module(f"host0:/{WORK_DIR}/remotejoy.prx")
         if not res.ok:
             raise RuntimeError(f"failed to load remotejoy.prx: {res.output.strip()}")
 
