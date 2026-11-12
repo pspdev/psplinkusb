@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "psplink": {
+      "command": "uv",
+      "args": ["run", "--directory", "tools/psplink-mcp", "psplink-mcp"],
+      "env": {
+        "PSPLINK_ROOT": "${PSPLINK_ROOT:-}"
+      }
+    }
+  }
+}
