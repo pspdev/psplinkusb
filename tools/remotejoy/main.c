@@ -147,11 +147,28 @@ int hook_ctrl_function(unsigned int* jump)
 {
 	unsigned int target;
 	unsigned int func;
+	unsigned int addr;
 	int inst;
+	int i;
 
 	target = GET_JUMP_TARGET(*jump);
-	inst = _lw(target+8);
-	if((inst & ~0x03FFFFFF) != 0x0C000000)
+
+	/* Each sceCtrl{Read,Peek}Buffer{Positive,Negative} is a short wrapper that
+	 * jals a common routine. The jal is at +8 on older firmware and at +12 on
+	 * 6.xx (where a CFW may also have patched the first instruction), so look
+	 * for the first jal near the start instead of assuming its offset. */
+	addr = 0;
+	for(i = 0; i < 8; i++)
+	{
+		inst = _lw(target + i*4);
+		if((inst & ~0x03FFFFFF) == 0x0C000000)
+		{
+			addr = target + i*4;
+			break;
+		}
+	}
+
+	if(addr == 0)
 	{
 		return 1;
 	}
@@ -160,7 +177,7 @@ int hook_ctrl_function(unsigned int* jump)
 
 	func = (unsigned int) ctrl_hook_func;
 	func = (func & 0x0FFFFFFF) >> 2;
-	_sw(0x0C000000 | func, target+8);
+	_sw(0x0C000000 | func, addr);
 
 	return 0;
 }
