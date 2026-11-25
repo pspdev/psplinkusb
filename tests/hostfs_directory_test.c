@@ -42,11 +42,19 @@ int main(void)
 {
 	char root[] = "/tmp/psplinkusb-dir-XXXXXX";
 	char linkpath[PATH_MAX];
+	char joined[12];
 	const char *iterations = getenv("HOSTFS_TEST_ITERATIONS");
 	int repetitions = iterations ? atoi(iterations) : 1000;
 	int did;
 	int found_link = 0;
 	int i;
+
+	/* Relative host-drive roots must reject overflow without truncation. */
+	assert(join_drive_path(joined, sizeof(joined), "host", "data") == 0);
+	assert(strcmp(joined, "host/data") == 0);
+	assert(join_drive_path(joined, sizeof("x/y"), "host", "data") < 0);
+	assert(strcmp(joined, "host/data") == 0);
+	assert(join_drive_path(joined, sizeof(joined), "123456789", "data") < 0);
 
 	assert(repetitions > 0);
 	assert(mkdtemp(root) != NULL);

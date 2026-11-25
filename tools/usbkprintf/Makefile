@@ -1,3 +1,5 @@
+WERROR ?= $(if $(filter true 1,$(CI)),1,0)
+
 TARGET = usbkprintf
 OBJS = main.o 
 
@@ -5,7 +7,7 @@ OBJS = main.o
 USE_KERNEL_LIBS = 1
 
 INCDIR = 
-CFLAGS = -Os -mno-gpopt -Wall -fno-builtin-printf
+CFLAGS = -Os -mno-gpopt -Wall $(if $(filter 1,$(WERROR)),-Werror) -fno-builtin-printf
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS = $(CFLAGS)
 

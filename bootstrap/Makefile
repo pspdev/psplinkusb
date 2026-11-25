@@ -1,3 +1,5 @@
+WERROR ?= $(if $(filter true 1,$(CI)),1,0)
+
 release: all
 	mksfoex -d MEMSIZE=1 'PSPLink v3.2.1' PARAM.SFO
 	pack-pbp EBOOT.PBP PARAM.SFO psplink.png NULL NULL NULL NULL psplink_boot.prx NULL
@@ -10,7 +12,7 @@ TARGET = psplink_boot
 OBJS = main.o
 
 INCDIR =
-CFLAGS = -O2 -mno-gpopt -Wall -g
+CFLAGS = -O2 -mno-gpopt -Wall $(if $(filter 1,$(WERROR)),-Werror) -g
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS = $(CFLAGS)
 

@@ -1,3 +1,5 @@
+WERROR ?= $(if $(filter true 1,$(CI)),1,0)
+
 TARGET=libpsplink.a
 all: $(TARGET)
 OBJS = psplink_0000.o psplink_0001.o psplink_0002.o psplink_0003.o psplink_0004.o psplink_0005.o psplink_0006.o psplink_0007.o psplink_0008.o psplink_0009.o psplink_0010.o 
@@ -9,7 +11,7 @@ clean:
 
 CC=psp-gcc
 INCDIR = 
-CFLAGS = -Os -mno-gpopt -Wall -fno-builtin-printf -I$(PSPSDK)/include
+CFLAGS = -Os -mno-gpopt -Wall $(if $(filter 1,$(WERROR)),-Werror) -fno-builtin-printf -I$(PSPSDK)/include
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS = $(CFLAGS)
 LDFLAGS=-nodefaultlibs
@@ -23,4 +25,3 @@ $(TARGET): $(OBJS)
 
 $(OBJS): psplink.S
 	$(CC) $(CFLAGS) -DF_$* $< -c -o $@
-

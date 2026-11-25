@@ -1,3 +1,5 @@
+WERROR ?= $(if $(filter true 1,$(CI)),1,0)
+
 TARGET = psplink
 OBJS = main.o shell.o config.o bitmap.o tty.o decodeaddr.o memoryUID.o kmode.o exception.o exception_asm.o psplinkcnf.o util.o debug.o libs.o apihook.o thctx.o stdio.o usbshell.o modload.o exports.o
 
@@ -5,7 +7,7 @@ OBJS = main.o shell.o config.o bitmap.o tty.o decodeaddr.o memoryUID.o kmode.o e
 USE_KERNEL_LIBS = 1
 
 INCDIR = ../usbhostfs
-CFLAGS = -Os -mno-gpopt -Wall -fno-builtin-printf -ggdb
+CFLAGS = -Os -mno-gpopt -Wall $(if $(filter 1,$(WERROR)),-Werror) -fno-builtin-printf -ggdb
 CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS = $(CFLAGS)
 LDFLAGS=-nodefaultlibs -L../libusbhostfs_driver

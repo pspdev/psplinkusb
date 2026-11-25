@@ -10,6 +10,7 @@
  */
 
 #include <stdio.h>
+#include <stdarg.h>
 #include <string.h>
 #include "disasm.h"
 
@@ -602,6 +603,32 @@ struct DisasmOpt g_disopts[DISASM_OPT_MAX] = {
 	{ DISASM_OPT_SIGNEDHEX, &g_signedhex, "Signed Hex" },
 };
 
+/* The decoder builds instruction arguments into a caller-owned buffer.
+ * Keep the legacy pointer-based formatting helpers bounded by that buffer. */
+static char *g_disasm_output_end;
+
+static int format_output(char *output, const char *fmt, ...)
+{
+	va_list args;
+	int written;
+	size_t available;
+
+	if(output >= g_disasm_output_end)
+		return 0;
+
+	available = (size_t)(g_disasm_output_end - output);
+	va_start(args, fmt);
+	written = vsnprintf(output, available, fmt, args);
+	va_end(args);
+	if(written < 0)
+	{
+		*output = 0;
+		return 0;
+	}
+
+	return (size_t)written >= available ? (int)available - 1 : written;
+}
+
 SymbolType disasmResolveSymbol(unsigned int PC, char *name, int namelen)
 {
 	SymbolEntry *s;
@@ -803,13 +830,13 @@ static char *print_cpureg(int reg, char *output)
 
 	if(!g_mregs)
 	{
-		len = sprintf(output, "$%s", regName[reg]);
+		len = format_output(output, "$%s", regName[reg]);
 	}
 	else
 	{
 		if(reg > 0)
 		{
-			len = sprintf(output, "r%d", reg);
+			len = format_output(output, "r%d", reg);
 		}
 		else
 		{
@@ -831,7 +858,7 @@ static char *print_int(int i, char *output)
 {
 	int len;
 
-	len = sprintf(output, "%d", i);
+	len = format_output(output, "%d", i);
 
 	return output + len;
 }
@@ -840,7 +867,7 @@ static char *print_hex(int i, char *output)
 {
 	int len;
 
-	len = sprintf(output, "0x%X", i);
+	len = format_output(output, "0x%X", i);
 
 	return output + len;
 }
@@ -856,18 +883,18 @@ static char *print_imm(int ofs, char *output)
 			int real;
 
 			real = -ofs;
-			len = sprintf(output, "-0x%X", real);
+			len = format_output(output, "-0x%X", real);
 		}
 		else
 		{
 			unsigned int val = ofs;
 			val &= 0xFFFF;
-			len = sprintf(output, "0x%X", val);
+			len = format_output(output, "0x%X", val);
 		}
 	}
 	else
 	{
-		len = sprintf(output, "%d", ofs);
+		len = format_output(output, "%d", ofs);
 	}
 
 	return output + len;
@@ -886,11 +913,11 @@ static char *print_jump(unsigned int addr, char *output)
 
 	if(symfound)
 	{
-		len = sprintf(output, "%s", symbol);
+		len = format_output(output, "%s", symbol);
 	}
 	else
 	{
-		len = sprintf(output, "0x%08X", addr);
+		len = format_output(output, "0x%08X", addr);
 	}
 
 	return output + len;
@@ -935,7 +962,7 @@ static char *print_syscall(unsigned int syscall, char *output)
 {
 	int len;
 
-	len = sprintf(output, "0x%X", syscall);
+	len = format_output(output, "0x%X", syscall);
 
 	return output + len;
 }
@@ -946,11 +973,11 @@ static char *print_cop0(int reg, char *output)
 
 	if(cop0_regs[reg])
 	{
-		len = sprintf(output, "%s", cop0_regs[reg]);
+		len = format_output(output, "%s", cop0_regs[reg]);
 	}
 	else
 	{
-		len = sprintf(output, "$%d", reg);
+		len = format_output(output, "$%d", reg);
 	}
 
 	return output + len;
@@ -960,7 +987,7 @@ static char *print_cop1(int reg, char *output)
 {
 	int len;
 
-	len = sprintf(output, "$fcr%d", reg);
+	len = format_output(output, "$fcr%d", reg);
 
 	return output + len;
 }
@@ -993,11 +1020,11 @@ static char *print_cop2(int reg, char *output)
 
 	if ((reg >= 128) && (reg < 128+16) && (vfpu_extra_regs[reg - 128]))
 	{
-		len = sprintf(output, "%s", vfpu_extra_regs[reg - 128]);
+		len = format_output(output, "%s", vfpu_extra_regs[reg - 128]);
 	}
 	else
 	{
-		len = sprintf(output, "$%d", reg);
+		len = format_output(output, "$%d", reg);
 	}
 
 	return output + len;
@@ -1019,11 +1046,11 @@ static char *print_vfpu_cond(int cond, char *output)
 
 	if ((cond >= 0) && (cond < 16))
 	{
-		len = sprintf(output, "%s", vfpu_cond_names[cond]);
+		len = format_output(output, "%s", vfpu_cond_names[cond]);
 	}
 	else
 	{
-		len = sprintf(output, "%d", cond);
+		len = format_output(output, "%d", cond);
 	}
 
 	return output + len;
@@ -1061,11 +1088,11 @@ static char *print_vfpu_const(int k, char *output)
 
 	if ((k > 0) && (k < 20))
 	{
-		len = sprintf(output, "%s", vfpu_const_names[k]);
+		len = format_output(output, "%s", vfpu_const_names[k]);
 	}
 	else
 	{
-		len = sprintf(output, "%d", k);
+		len = format_output(output, "%d", k);
 	}
 
 	return output + len;
@@ -1100,13 +1127,13 @@ static char *print_vfpu_halffloat(int l, char *output)
 	if (exponent == VFPU_FLOAT16_EXP_MAX)
 	{
 		if (fraction == 0)
-			len = sprintf(output, "%cInf", signchar);
+			len = format_output(output, "%cInf", signchar);
 		else
-			len = sprintf(output, "%cNaN", signchar);
+			len = format_output(output, "%cNaN", signchar);
 	}
 	else if (exponent == 0 && fraction == 0)
 	{
-		len = sprintf(output, "%c0", signchar);
+		len = format_output(output, "%c0", signchar);
 	}
 	else
 	{
@@ -1126,7 +1153,7 @@ static char *print_vfpu_halffloat(int l, char *output)
 		float2int.i = sign << 31;
 		float2int.i |= (exponent + 112) << 23;
 		float2int.i |= fraction << 13;
-		len = sprintf(output, "%g", float2int.f);
+		len = format_output(output, "%g", float2int.f);
 	}
 
 	return output + len;
@@ -1185,17 +1212,17 @@ static char *print_vfpu_prefix(int l, unsigned int pos, char *output)
 			unsigned int swz_constlo = (l >> ((pos - base) * 2)) & VFPU_MASK_PFX_SWZ_CSTLO;
 
 			if (negation)
-				len = sprintf(output, "-");
+				len = format_output(output, "-");
 			if (constant)
 			{
-				len += sprintf(output+len, "%s", pfx_cst_names[(abs_consthi << 2) | swz_constlo]);
+				len += format_output(output+len, "%s", pfx_cst_names[(abs_consthi << 2) | swz_constlo]);
 			}
 			else
 			{
 				if (abs_consthi)
-					len += sprintf(output+len, "|%s|", pfx_swz_names[swz_constlo]);
+					len += format_output(output+len, "|%s|", pfx_swz_names[swz_constlo]);
 				else
-					len += sprintf(output+len, "%s", pfx_swz_names[swz_constlo]);
+					len += format_output(output+len, "%s", pfx_swz_names[swz_constlo]);
 			}
 		}
 		break;
@@ -1210,9 +1237,9 @@ static char *print_vfpu_prefix(int l, unsigned int pos, char *output)
 			unsigned int saturation = (l >> ((pos - base) * 2)) & VFPU_MASK_PFX_SAT;
 
 			if (mask)
-				len += sprintf(output, "m");
+				len += format_output(output, "m");
 			else
-				len += sprintf(output, "%s", pfx_sat_names[saturation]);
+				len += format_output(output, "%s", pfx_sat_names[saturation]);
 		}
 		break;
 	}
@@ -1236,7 +1263,7 @@ static char *print_vfpu_prefix(int l, unsigned int pos, char *output)
 // [hlide] added print_vfpu_rotator
 static char *print_vfpu_rotator(int l, char *output)
 {
-	int len;
+	char *cursor = output;
 
 	const char *elements[4];
 
@@ -1286,26 +1313,25 @@ static char *print_vfpu_rotator(int l, char *output)
 		elements[rothi] = "s";
 	elements[rotlo] = "c";
 
-	len = sprintf(output, "[");
+	cursor += format_output(cursor, "[");
 
-	for (i = 0;;)
+	for (i = 0; i < opsize; i++)
 	{
-		len += sprintf(output, "%s", elements[i++]);
-		if (i >= opsize)
-			break;
-		sprintf(output, " ,");
+		if (i > 0)
+			cursor += format_output(cursor, ", ");
+		cursor += format_output(cursor, "%s", elements[i]);
 	}
 
-	len += sprintf(output, "]");
+	cursor += format_output(cursor, "]");
 
-	return output + len;
+	return cursor;
 }
 
 static char *print_fpureg(int reg, char *output)
 {
 	int len;
 
-	len = sprintf(output, "$fpr%02d", reg);
+	len = format_output(output, "$fpr%02d", reg);
 
 	return output + len;
 }
@@ -1316,11 +1342,11 @@ static char *print_debugreg(int reg, char *output)
 
 	if((reg < 16) && (dr_regs[reg]))
 	{
-		len = sprintf(output, "%s", dr_regs[reg]);
+		len = format_output(output, "%s", dr_regs[reg]);
 	}
 	else
 	{
-		len = sprintf(output, "$%02d\n", reg);
+		len = format_output(output, "$%02d\n", reg);
 	}
 
 	return output + len;
@@ -1330,7 +1356,7 @@ static char *print_vfpusingle(int reg, char *output)
 {
 	int len;
 
-	len = sprintf(output, "S%d%d%d", (reg >> 2) & 7, reg & 3, (reg >> 5) & 3);
+	len = format_output(output, "S%d%d%d", (reg >> 2) & 7, reg & 3, (reg >> 5) & 3);
 
 	return output + len;
 }
@@ -1341,11 +1367,11 @@ static char *print_vfpu_reg(int reg, int offset, char one, char two, char *outpu
 
 	if((reg >> 5) & 1)
 	{
-		len = sprintf(output, "%c%d%d%d", two, (reg >> 2) & 7, offset, reg & 3);
+		len = format_output(output, "%c%d%d%d", two, (reg >> 2) & 7, offset, reg & 3);
 	}
 	else
 	{
-		len = sprintf(output, "%c%d%d%d", one, (reg >> 2) & 7, reg & 3, offset);
+		len = format_output(output, "%c%d%d%d", one, (reg >> 2) & 7, reg & 3, offset);
 	}
 
 	return output + len;
@@ -1433,12 +1459,14 @@ static char *print_vfpureg(int reg, char type, char *output)
 	return output;
 }
 
-static void decode_args(unsigned int opcode, unsigned int PC, const char *fmt, char *output, unsigned int *realregs)
+static void decode_args(unsigned int opcode, unsigned int PC, const char *fmt, char *output,
+	size_t outputlen, unsigned int *realregs)
 {
 	int i = 0;
 	int vmmul = 0;
 
-	while(fmt[i])
+	g_disasm_output_end = output + outputlen;
+	while(fmt[i] && output < g_disasm_output_end - 1)
 	{
 		if(fmt[i] == '%')
 		{
@@ -1603,7 +1631,7 @@ const char *disasmInstruction(unsigned int opcode, unsigned int PC, unsigned int
 	int i;
 	struct Instruction *ix = NULL;
 
-	sprintf(addr, "0x%08X", PC);
+	snprintf(addr, sizeof(addr), "0x%08X", PC);
 	if((g_syms) && (g_symaddr))
 	{
 		char addrtemp[128];
@@ -1644,7 +1672,7 @@ const char *disasmInstruction(unsigned int opcode, unsigned int PC, unsigned int
 
 	if(ix)
 	{
-		decode_args(opcode, PC, ix->fmt, args, realregs);
+		decode_args(opcode, PC, ix->fmt, args, sizeof(args), realregs);
 
 		if(regmask) 
 		{
