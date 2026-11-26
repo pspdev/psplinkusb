@@ -577,7 +577,12 @@ void cli_handler(char *buf)
 				char b[1024];
 
 				snprintf(b, sizeof(b), "%s\n", buf);
-				write(g_context.outsock, b, strlen(b));
+				if(fixed_write(g_context.outsock, b, strlen(b)) < 0)
+				{
+					FD_CLR(g_context.outsock, &g_context.readsave);
+					close(g_context.outsock);
+					g_context.outsock = -1;
+				}
 			}
 
 			return;
@@ -632,11 +637,17 @@ void cli_handler(char *buf)
 		{
 			if(strncmp(&buf[1], "cd ", 3) == 0)
 			{
-				chdir(&buf[4]);
+				if(chdir(&buf[4]) < 0)
+				{
+					perror("chdir");
+				}
 			}
 			else
 			{
-				system(&buf[1]);
+				if(system(&buf[1]) == -1)
+				{
+					perror("system");
+				}
 			}
 			return;
 		}
@@ -644,7 +655,12 @@ void cli_handler(char *buf)
 		{
 			if(g_context.fssock >= 0)
 			{
-				(void) write(g_context.fssock, &buf[1], strlen(&buf[1]));
+				if(fixed_write(g_context.fssock, &buf[1], strlen(&buf[1])) < 0)
+				{
+					FD_CLR(g_context.fssock, &g_context.readsave);
+					close(g_context.fssock);
+					g_context.fssock = -1;
+				}
 			}
 			return;
 		}
@@ -813,7 +829,10 @@ char *filename_gen(const char *text, int state)
 			curr += strlen(curr)+1;
 		}
 		*curr++ = 1;
-		write(g_context.sock, cmd, curr-cmd);
+		if(fixed_write(g_context.sock, cmd, curr-cmd) < 0)
+		{
+			return NULL;
+		}
 		pEntry = read_tab_completion();
 		if(pEntry == NULL)
 		{
@@ -878,7 +897,10 @@ char *uid_gen(const char *text, int state)
 		strcpy(curr, text);
 		curr += strlen(curr)+1;
 		*curr++ = 1;
-		write(g_context.sock, cmd, curr-cmd);
+		if(fixed_write(g_context.sock, cmd, curr-cmd) < 0)
+		{
+			return NULL;
+		}
 		pEntry = read_tab_completion();
 	}
 
