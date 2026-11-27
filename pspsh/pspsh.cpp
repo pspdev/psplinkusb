@@ -28,6 +28,8 @@
 #include "pspkerror.h"
 #include "disasm.h"
 #include "asm.h"
+#include "joy.h"
+#include "../usbhostfs/usbasync.h"
 
 #ifndef SOL_TCP
 #define SOL_TCP 6
@@ -62,6 +64,7 @@ struct GlobalContext
 	int outsock;
 	int errsock;
 	int fssock;
+	int joysock;
 	char history_file[PATH_MAX];
 	char currpath[PATH_MAX];
 	char currcmd[PATH_MAX];
@@ -97,6 +100,8 @@ int disclear_cmd(int argc, char **argv);
 int disopts_cmd(int argc, char **argv);
 int tty_cmd(int argc, char **argv);
 int symload_cmd(int argc, char **argv);
+int joy_cmd(int argc, char **argv);
+int connect_to(const char *ipaddr, unsigned short port, bool monitor = true);
 void cli_handler(char *buf);
 struct TabEntry* read_tab_completion(void);
 struct TabEntry
@@ -398,7 +403,7 @@ int execute_script_line(void)
 	}
 	else if(g_context.fscript)
 	{
-		while(fgets(line, sizeof(line), g_context.fscript))
+		while(g_context.fscript && fgets(line, sizeof(line), g_context.fscript))
 		{
 			int ret = execute_line(line);
 			if(ret < 0)
@@ -555,6 +560,50 @@ int exit_cmd(int argc, char **argv)
 {
 	g_context.exit = 1;
 	return 1;
+}
+
+int joy_cmd(int argc, char **argv)
+{
+	struct JoyCommand command;
+	int result = 1;
+
+	if(joy_parse(argc, argv, &command))
+	{
+		if(g_context.args.port > UINT16_MAX - ASYNC_USER)
+		{
+			fprintf(stderr, "RemoteJoy port exceeds TCP port range\n");
+		}
+		else
+		{
+			/* Keep the async channel open across commands: the bridge replaces
+			 * its current client when another connection is accepted. */
+			if(g_context.joysock < 0)
+			{
+				g_context.joysock = connect_to(g_context.args.ip, g_context.args.port + ASYNC_USER, false);
+			}
+			if(g_context.joysock < 0)
+			{
+				fprintf(stderr, "Could not connect to RemoteJoy channel\n");
+			}
+			else
+			{
+				result = joy_send(g_context.joysock, &command) < 0;
+				if(result)
+				{
+					close(g_context.joysock);
+					g_context.joysock = -1;
+				}
+			}
+		}
+	}
+
+	g_context.lasterr = result;
+	(void)setenv("?", result ? "1" : "0", 1);
+	if(result && in_script())
+	{
+		close_script();
+	}
+	return 0;
 }
 
 void cli_handler(char *buf)
@@ -1653,7 +1702,7 @@ int read_fssocket(int sock)
 	return len;
 }
 
-int connect_to(const char *ipaddr, unsigned short port)
+int connect_to(const char *ipaddr, unsigned short port, bool monitor)
 {
 	int sock = -1;
 	int success = 0;
@@ -1677,7 +1726,7 @@ int connect_to(const char *ipaddr, unsigned short port)
 			perror("connect");
 			break;
 		}
-		else
+		else if(monitor)
 		{
 			FD_SET(sock, &g_context.readsave);
 		}
@@ -1980,6 +2029,11 @@ int shell(void)
 
 void shutdown_app(void)
 {
+	if(g_context.joysock >= 0)
+	{
+		close(g_context.joysock);
+		g_context.joysock = -1;
+	}
 	if(g_context.sock >= 0)
 	{
 		close(g_context.sock);
@@ -2049,6 +2103,7 @@ int main(int argc, char **argv)
 	g_context.outsock = -1;
 	g_context.errsock = -1;
 	g_context.fssock = -1;
+	g_context.joysock = -1;
 	g_context.fstdout = stdout;
 	g_context.fstderr = stderr;
 	if(parse_args(argc, argv, &g_context.args))

@@ -26,11 +26,12 @@
 #include <SDL.h>
 #include <SDL_thread.h>
 #include "../remotejoy.h"
+#include "pspctrl.h"
 
 #define DEFAULT_PORT 10004
 #define DEFAULT_IP   "localhost"
 
-#define MAX_AXES_NUM 32767
+#define MAX_AXES_NUM INT16_MAX
 #define DIGITAL_TOL   10000
 
 #define PSP_SCREEN_W  480
@@ -84,44 +85,6 @@ uint64_t swap64(uint64_t i)
 #define LE32(x) (x)
 #define LE64(x) (x)
 #endif
-
-enum PspCtrlButtons
-{
-	/** Select button. */
-	PSP_CTRL_SELECT     = 0x000001,
-	/** Start button. */
-	PSP_CTRL_START      = 0x000008,
-	/** Up D-Pad button. */
-	PSP_CTRL_UP         = 0x000010,
-	/** Right D-Pad button. */
-	PSP_CTRL_RIGHT      = 0x000020,
-	/** Down D-Pad button. */
-	PSP_CTRL_DOWN      	= 0x000040,
-	/** Left D-Pad button. */
-	PSP_CTRL_LEFT      	= 0x000080,
-	/** Left trigger. */
-	PSP_CTRL_LTRIGGER   = 0x000100,
-	/** Right trigger. */
-	PSP_CTRL_RTRIGGER   = 0x000200,
-	/** Triangle button. */
-	PSP_CTRL_TRIANGLE   = 0x001000,
-	/** Circle button. */
-	PSP_CTRL_CIRCLE     = 0x002000,
-	/** Cross button. */
-	PSP_CTRL_CROSS      = 0x004000,
-	/** Square button. */
-	PSP_CTRL_SQUARE     = 0x008000,
-	/** Home button. */
-	PSP_CTRL_HOME       = 0x010000,
-	/** Music Note button. */
-	PSP_CTRL_NOTE       = 0x800000,
-	/** Screen button. */
-	PSP_CTRL_SCREEN     = 0x400000,
-	/** Volume up button. */
-	PSP_CTRL_VOLUP      = 0x100000,
-	/** Volume down button. */
-	PSP_CTRL_VOLDOWN    = 0x200000,
-};
 
 enum PspButtons
 {
@@ -1275,16 +1238,14 @@ void mainloop(void)
 					int val = event.jaxis.value + MAX_AXES_NUM;
 					if(event.jaxis.axis & 1)
 					{
-						/* Send Ly (val * 255) / (MAX_AXES_NUM * 2)) */
-						if(!send_event(sock, TYPE_ANALOG_Y, (val * 255) / (MAX_AXES_NUM * 2)))
+						if(!send_event(sock, TYPE_ANALOG_Y, (val * JOY_ANALOG_MAX) / (MAX_AXES_NUM * 2)))
 						{
 							break;
 						}
 					}
 					else
 					{
-						/* Send Lx (val * 255) / (MAX_AXES_NUM * 2)) */
-						if(!send_event(sock, TYPE_ANALOG_X, (val * 255) / (MAX_AXES_NUM * 2)))
+						if(!send_event(sock, TYPE_ANALOG_X, (val * JOY_ANALOG_MAX) / (MAX_AXES_NUM * 2)))
 						{
 							break;
 						}

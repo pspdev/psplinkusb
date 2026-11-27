@@ -26,3 +26,5 @@ LIBDIR =
 
 PSPSDK=$(shell psp-config --pspsdk-path)
 include $(PSPSDK)/lib/build_prx.mak
+
+main.o: remotejoy.h joy_stream.h ctrl_wrapper.h ../../psplink/mips_insn.h

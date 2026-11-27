@@ -21,9 +21,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 #include <usbasync.h>
 #include <apihook.h>
 #include "remotejoy.h"
+#include "joy_stream.h"
+#include "ctrl_wrapper.h"
 
 PSP_MODULE_INFO("RemoteJoy", PSP_MODULE_KERNEL, 1, 1);
 
@@ -36,6 +39,7 @@ PSP_MODULE_INFO("RemoteJoy", PSP_MODULE_KERNEL, 1, 1);
 #endif
 
 #define SCREEN_WAIT_TIMEOUT (100*1000)
+#define USB_READ_RETRY_DELAY_US 250000
 
 //#define DEBUG_PRINTF(x, ...) printf(x, ## __VA_ARGS__)
 #define DEBUG_PRINTF(x, ...)
@@ -56,18 +60,22 @@ int scePowerVolatileMemLock(int, char**, int*);
 unsigned int psplinkSetK1(unsigned int k1);
 extern u32 sceKernelSetDdrMemoryProtection;
 int (*g_ctrl_common)(SceCtrlData *, int count, int type);
+static int (*g_ctrl_common_four)(SceCtrlData *, int count, int port, int type);
 
 #define ASYNC_JOY ASYNC_USER
 #define ABS(x) ((x) < 0 ? -x : x)
-
-#define GET_JUMP_TARGET(x) (0x80000000 | (((x) & 0x03FFFFFF) << 2))
 
 int map_axis(int real, int new)
 {
 	int val1, val2;
 
-	val1 = ((int) real) - 127;
-	val2 = ((int) new) - 127;
+	/* Older RemoteJoy clients scale their neutral position to 127. */
+	if(new == JOY_ANALOG_LEGACY_CENTER || new == JOY_ANALOG_CENTER)
+	{
+		return real;
+	}
+	val1 = real - JOY_ANALOG_LEGACY_CENTER;
+	val2 = new - JOY_ANALOG_LEGACY_CENTER;
 
 	if(ABS(val1) > ABS(val2))
 	{
@@ -84,11 +92,11 @@ unsigned int calc_mask(void)
 	int i;
 	unsigned int mask = 0;
 
-	for(i = 0; i < 32; i++)
+	for(i = 0; i < (int)(sizeof(mask) * CHAR_BIT); i++)
 	{
-		if(sceCtrlGetButtonMask(1 << i) == 1)
+		if(sceCtrlGetButtonMask(1U << i) == SCE_CTRL_MASK_IGNORE_BUTTONS)
 		{
-			mask |= (1 << i);
+			mask |= (1U << i);
 		}
 	}
 
@@ -138,29 +146,84 @@ int ctrl_hook_func(SceCtrlData *pad_data, int count, int type)
 		return ret;
 	}
 
-	add_values(pad_data, ret, type & 1);
+	add_values(pad_data, ret, type & CTRL_WRAPPER_NEGATIVE);
 
 	return ret;
 }
 
-int hook_ctrl_function(unsigned int* jump)
+static int ctrl_hook_func_four(SceCtrlData *pad_data, int count, int port, int type)
 {
-	unsigned int target;
-	unsigned int func;
-	int inst;
-
-	target = GET_JUMP_TARGET(*jump);
-	inst = _lw(target+8);
-	if((inst & ~0x03FFFFFF) != 0x0C000000)
+	int ret = g_ctrl_common_four(pad_data, count, port, type);
+	if(ret > 0)
 	{
-		return 1;
+		add_values(pad_data, ret, type & CTRL_WRAPPER_NEGATIVE);
+	}
+	return ret;
+}
+
+static int hook_ctrl_functions(void)
+{
+	unsigned int *stubs[] = {
+		(unsigned int*)sceCtrlReadBufferPositive,
+		(unsigned int*)sceCtrlPeekBufferPositive,
+		(unsigned int*)sceCtrlReadBufferNegative,
+		(unsigned int*)sceCtrlPeekBufferNegative
+	};
+	unsigned int targets[sizeof(stubs) / sizeof(stubs[0])];
+	const unsigned int modes[] = { CTRL_WRAPPER_READ, CTRL_WRAPPER_PEEK,
+		CTRL_WRAPPER_READ | CTRL_WRAPPER_NEGATIVE, CTRL_WRAPPER_PEEK | CTRL_WRAPPER_NEGATIVE };
+	enum CtrlWrapperLayout layout = CTRL_WRAPPER_UNKNOWN;
+	unsigned int common = 0;
+	unsigned int i, func;
+	int intc;
+
+	/* Validate every wrapper before changing any firmware instruction. */
+	for(i = 0; i < sizeof(stubs) / sizeof(stubs[0]); ++i)
+	{
+		unsigned int inst = *stubs[i];
+		unsigned int target, callee, offset;
+		enum CtrlWrapperLayout current;
+		if(mips_opcode(inst) != MIPS_OP_J)
+		{
+			return 1;
+		}
+		target = mips_jump_target((uint32_t)stubs[i], inst);
+		current = ctrl_wrapper_layout((const uint32_t *)target, modes[i]);
+		if(current == CTRL_WRAPPER_UNKNOWN || (i && current != layout))
+		{
+			return 1;
+		}
+		layout = current;
+		offset = (layout == CTRL_WRAPPER_FOUR_ARGS ? CTRL_WRAPPER_FOUR_ARGS_CALL :
+			CTRL_WRAPPER_LEGACY_CALL) * sizeof(uint32_t);
+		inst = _lw(target + offset);
+		callee = mips_jump_target(target + offset, inst);
+		if(common && callee != common)
+		{
+			return 1;
+		}
+		common = callee;
+		targets[i] = target + offset;
 	}
 
-	g_ctrl_common = (void*) GET_JUMP_TARGET(inst);
-
-	func = (unsigned int) ctrl_hook_func;
-	func = (func & 0x0FFFFFFF) >> 2;
-	_sw(0x0C000000 | func, target+8);
+	intc = pspSdkDisableInterrupts();
+	if(layout == CTRL_WRAPPER_FOUR_ARGS)
+	{
+		g_ctrl_common_four = (void*)common;
+		func = (unsigned int)ctrl_hook_func_four;
+	}
+	else
+	{
+		g_ctrl_common = (void*)common;
+		func = (unsigned int)ctrl_hook_func;
+	}
+	for(i = 0; i < sizeof(targets) / sizeof(targets[0]); ++i)
+	{
+		_sw(mips_encode_jump(MIPS_OP_JAL, func), targets[i]);
+	}
+	sceKernelDcacheWritebackInvalidateAll();
+	sceKernelIcacheInvalidateAll();
+	pspSdkEnableInterrupts(intc);
 
 	return 0;
 }
@@ -361,20 +424,19 @@ int screen_thread(SceSize args, void *argp)
 	{
 		p = &sceKernelSetDdrMemoryProtection;
 
-		baseaddr = GET_JUMP_TARGET(*p);
-		_sw(0x03E00008, baseaddr);
-		_sw(0x00001021, baseaddr+4);
-		sceKernelDcacheWritebackInvalidateRange((void*) baseaddr, 8);
-		sceKernelIcacheInvalidateRange((void*) baseaddr, 8);
+		baseaddr = mips_jump_target((uint32_t)p, *p);
+		_sw(mips_jr(MIPS_REG_RA), baseaddr);
+		_sw(mips_move(MIPS_REG_V0, MIPS_REG_ZERO), baseaddr + sizeof(uint32_t));
+		sceKernelDcacheWritebackInvalidateRange((void*) baseaddr, 2 * sizeof(uint32_t));
+		sceKernelIcacheInvalidateRange((void*) baseaddr, 2 * sizeof(uint32_t));
 	}
 
 	p = (u32*) sceDisplaySetFrameBuf;
 
-	baseaddr = GET_JUMP_TARGET(*p);
+	baseaddr = mips_jump_target((uint32_t)p, *p);
 	func = (unsigned int) set_frame_buf;
-	func = (func & 0x0FFFFFFF) >> 2;
-	_sw(0x08000000 | func, baseaddr);
-	_sw(0, baseaddr+4);
+	_sw(mips_encode_jump(MIPS_OP_J, func), baseaddr);
+	_sw(mips_nop(), baseaddr + sizeof(uint32_t));
 
 	sceKernelDcacheWritebackInvalidateAll();
 	sceKernelIcacheInvalidateAll();
@@ -522,6 +584,8 @@ void send_screen_probe(void)
 int main_thread(SceSize args, void *argp)
 {
 	struct JoyEvent joyevent;
+	struct JoyStream stream = {0};
+	unsigned char bytes[sizeof(struct JoyEvent)];
 	int intc;
 
 #ifdef BUILD_PLUGIN
@@ -542,22 +606,19 @@ int main_thread(SceSize args, void *argp)
 	retVal = sceUsbActivate(HOSTFSDRIVER_PID);
 #endif
 
-	if(hook_ctrl_function((unsigned int*) sceCtrlReadBufferPositive) || 
-		hook_ctrl_function((unsigned int*) sceCtrlPeekBufferPositive) ||
-		hook_ctrl_function((unsigned int*) sceCtrlReadBufferNegative) ||
-		hook_ctrl_function((unsigned int*) sceCtrlPeekBufferNegative))
-	{
-		DEBUG_PRINTF("Could not hook controller functions\n");
-		sceKernelExitDeleteThread(0);
-	}
-	sceKernelDcacheWritebackInvalidateAll();
-	sceKernelIcacheInvalidateAll();
-
 	if(usbAsyncRegister(ASYNC_JOY, &g_endp) < 0)
 	{
-		DEBUG_PRINTF("Could not register remotejoy provider\n");
+		Kprintf("RemoteJoy: could not register async provider\n");
 		sceKernelExitDeleteThread(0);
 	}
+
+	if(hook_ctrl_functions())
+	{
+		usbAsyncUnregister(ASYNC_JOY);
+		Kprintf("RemoteJoy: unsupported controller wrapper layout\n");
+		sceKernelExitDeleteThread(0);
+	}
+	Kprintf("RemoteJoy: controller hooks installed\n");
 
 	usbWaitForConnect();
 
@@ -566,45 +627,48 @@ int main_thread(SceSize args, void *argp)
 
 	while(1)
 	{
-		int len;
-		len = usbAsyncRead(ASYNC_JOY, (void*) &joyevent, sizeof(joyevent));
+		int len, i;
+		len = usbAsyncRead(ASYNC_JOY, bytes, sizeof(bytes));
 
-		if((len != sizeof(joyevent)) || (joyevent.magic != JOY_MAGIC))
+		if(len <= 0)
 		{
 			if(len < 0)
 			{
+				memset(&stream, 0, sizeof(stream));
+				intc = pspSdkDisableInterrupts();
+				g_currjoy.Buttons = 0;
+				g_currjoy.Lx = g_currjoy.Ly = JOY_ANALOG_CENTER;
+				pspSdkEnableInterrupts(intc);
 				/* Delay thread, necessary to ensure that the kernel can reboot :) */
-				sceKernelDelayThread(250000);
-			}
-			else
-			{
-				DEBUG_PRINTF("Invalid read size %d\n", len);
-				usbAsyncFlush(ASYNC_JOY);
+				sceKernelDelayThread(USB_READ_RETRY_DELAY_US);
 			}
 			continue;
 		}
-
-		intc = pspSdkDisableInterrupts();
-		switch(joyevent.type)
+		for(i = 0; i < len; ++i)
 		{
-			case TYPE_BUTTON_UP: g_currjoy.Buttons &= ~joyevent.value;
-								 break;
-			case TYPE_BUTTON_DOWN: g_currjoy.Buttons |= joyevent.value;
-								 break;  
-			case TYPE_ANALOG_Y: g_currjoy.Ly = joyevent.value;
-								break;
-			case TYPE_ANALOG_X: g_currjoy.Lx = joyevent.value;
-								break;
-			default: break;
-		};
-		pspSdkEnableInterrupts(intc);
+			if(!joy_stream_push(&stream, bytes[i], &joyevent))
+			{
+				continue;
+			}
 
-		/* We do screen stuff outside the disabled interrupts */
-		if(joyevent.type == TYPE_SCREEN_CMD)
-		{
-			do_screen_cmd(joyevent.value);
+			intc = pspSdkDisableInterrupts();
+			switch(joyevent.type)
+			{
+				case TYPE_BUTTON_UP: g_currjoy.Buttons &= ~joyevent.value; break;
+				case TYPE_BUTTON_DOWN: g_currjoy.Buttons |= joyevent.value; break;
+				case TYPE_ANALOG_Y: g_currjoy.Ly = joyevent.value; break;
+				case TYPE_ANALOG_X: g_currjoy.Lx = joyevent.value; break;
+				default: break;
+			}
+			pspSdkEnableInterrupts(intc);
+
+			/* We do screen stuff outside the disabled interrupts */
+			if(joyevent.type == TYPE_SCREEN_CMD)
+			{
+				do_screen_cmd(joyevent.value);
+			}
+			scePowerTick(PSP_POWER_TICK_ALL);
 		}
-		scePowerTick(0);
 	}
 
 	return 0;
@@ -616,8 +680,8 @@ int module_start(SceSize args, void *argp)
 	int thid;
 
 	memset(&g_currjoy, 0, sizeof(g_currjoy));
-	g_currjoy.Lx = 0x80;
-	g_currjoy.Ly = 0x80;
+	g_currjoy.Lx = JOY_ANALOG_CENTER;
+	g_currjoy.Ly = JOY_ANALOG_CENTER;
 	/* Create a high priority thread */
 	thid = sceKernelCreateThread("RemoteJoy", main_thread, 15, 0x800, 0, NULL);
 	if(thid >= 0)

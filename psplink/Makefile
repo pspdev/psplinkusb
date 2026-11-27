@@ -20,3 +20,5 @@ PSPSDK=$(shell psp-config --pspsdk-path)
 include $(PSPSDK)/lib/build_prx.mak
 
 LIBS += -lpsppower_driver -lpspdisplay_driver
+
+debug.o libs.o: mips_insn.h

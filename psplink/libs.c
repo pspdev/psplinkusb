@@ -20,6 +20,7 @@
 #include "util.h"
 #include "psplink.h"
 #include "libs.h"
+#include "mips_insn.h"
 
 struct PspModuleImport
 {
@@ -217,10 +218,10 @@ int libsPatchFunction(SceUID uid, const char *library, unsigned int nid, u16 ret
 	addr = (unsigned int *) libsFindExportByNid(uid, library, nid);
 	if(addr)
 	{
-		addr[0] = 0x03E00008;
-		addr[1] = 0x24020000 | (unsigned int) retval;
-		sceKernelDcacheWritebackInvalidateRange(addr, 8);
-		sceKernelIcacheInvalidateRange(addr, 8);
+		addr[0] = mips_jr(MIPS_REG_RA);
+		addr[1] = mips_addiu(MIPS_REG_V0, MIPS_REG_ZERO, retval);
+		sceKernelDcacheWritebackInvalidateRange(addr, 2 * sizeof(*addr));
+		sceKernelIcacheInvalidateRange(addr, 2 * sizeof(*addr));
 		ret = 1;
 	}
 	pspSdkEnableInterrupts(intc);
