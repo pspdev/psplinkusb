@@ -37,6 +37,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Download PSPSDK controller header
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force .deps/pspsdk | Out-Null
+          Invoke-WebRequest -Uri https://raw.githubusercontent.com/pspdev/pspsdk/40da14ada3342368ebdfaac8fd3f769e99fd26ac/src/ctrl/pspctrl.h -OutFile .deps/pspsdk/pspctrl.h
+
       - name: Set up Cygwin
         uses: egor-tensin/setup-cygwin@v4
         with:
@@ -44,7 +50,7 @@ jobs:
 
       - name: Compile project
         run: |
-          make -j $(getconf _NPROCESSORS_ONLN) -C pspsh
+          make -j $(getconf _NPROCESSORS_ONLN) -C pspsh PSPSDK_CTRL_DIR=../.deps/pspsdk
           make -j $(getconf _NPROCESSORS_ONLN) -C usbhostfs_pc
           mkdir build
           cp usbhostfs_pc\usbhostfs_pc.exe build

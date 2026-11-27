@@ -22,6 +22,7 @@
 #include "debug.h"
 #include "decodeaddr.h"
 #include "thctx.h"
+#include "mips_insn.h"
 
 #define SW_BREAK_INST	0x0000000d
 
@@ -147,13 +148,7 @@ int debugWaitDebugEvent(DebugEventHandler *handler, struct PsplinkContext **ctx,
 #define BLTZALL_OPCODE	0x12
 #define BLTZL_OPCODE	0x2
 
-#define J_OPCODE		0x2
-#define JAL_OPCODE		0x3
-
 /* Special opcode */
-#define SPECIAL_OPCODE	0
-#define JALR_OPCODE		0x9
-#define JR_OPCODE		0x8
 #define SYSCALL_OPCODE  0xc
 
 /* Cop Branches (all the same) */
@@ -180,7 +175,7 @@ static void step_generic(struct PsplinkContext *ctx, int skip)
 
 	opcode = _lw(epc);
 
-	switch(opcode >> 26)
+	switch(mips_opcode(opcode))
 	{
 		case BEQ_OPCODE:
 		case BEQL_OPCODE:
@@ -221,26 +216,23 @@ static void step_generic(struct PsplinkContext *ctx, int skip)
 								}
 						    }
 							break;
-		case JAL_OPCODE:	link = 1;
-		case J_OPCODE: {
-							 unsigned int ofs;
-							 
-							 ofs = opcode & 0x3ffffff;
-							 targetpc = (ofs << 2) | (targetpc & 0xf0000000);
+		case MIPS_OP_JAL:	link = 1;
+		case MIPS_OP_J: {
+							 targetpc = mips_jump_target(epc, opcode);
 							 branch = 1;
 							 cond = 0;
 						 }
 						 break;
-		case SPECIAL_OPCODE:
+		case MIPS_OP_SPECIAL:
 						 {
-							 switch(opcode & 0x3f)
+							 switch(mips_function(opcode))
 							 {
-								 case JALR_OPCODE: link = 1;
-								 case JR_OPCODE:
+								 case MIPS_FUNC_JALR: link = 1;
+								 case MIPS_FUNC_JR:
 												 {
 													 unsigned int rs;
 
-													 rs = (opcode >> 21) & 0x1f;
+													 rs = mips_rs(opcode);
 													 targetpc = ctx->regs.r[rs];
 													 branch = 1;
 													 cond = 0;

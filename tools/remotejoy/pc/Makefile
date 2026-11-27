@@ -9,8 +9,13 @@ PREFIX=$(shell psp-config --pspdev-path 2> /dev/null)
 
 all: $(OUTPUT)
 
+include ../../../pspsdk-headers.mk
+
 $(OUTPUT): $(OBJS)
 	$(CC) -o $@ $^ 
+
+remotejoy.o: override CPPFLAGS += $(PSPCTRL_CPPFLAGS)
+remotejoy.o: ../remotejoy.h $(PSPCTRL_HEADER)
 
 install: $(OUTPUT)
 	@echo "Installing $(OUTPUT)..."

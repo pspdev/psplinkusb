@@ -26,6 +26,20 @@ Build it:
 make all
 ```
 
+## Native client builds
+
+`pspsh` and the RemoteJoy clients use the controller header from the installed
+PSPSDK (located with `psp-config`). To build only the host clients without a PSP
+toolchain, use an existing PSPSDK source checkout instead:
+
+```bash
+git clone https://github.com/pspdev/pspsdk.git ../pspsdk
+make -f Makefile.clients PSPSDK_CTRL_DIR="$(cd ../pspsdk/src/ctrl && pwd)"
+```
+
+Only `pspctrl.h` is needed from that checkout; PSPSDK does not need to be built.
+The standalone `usbhostfs_pc` build does not require the controller header.
+
 # License
 
  - (c) TyRaNiD 2005-2007

@@ -245,6 +245,12 @@ struct sh_command
 	SHELL_CMD("cop0", "c0", cop0_cmd, 0, "Print the cop0 registers", "", "") \
 	SHELL_CMD_SHARED("exit", "quit", exit_cmd, 0, "Exit the shell", "", "") \
 	SHELL_CMD_PCTERM("close", NULL, close_cmd, 0, "Close the shell (leave PSP running)", "", "") \
+	SHELL_CMD_PCTERM("joy", NULL, joy_cmd, 0, "Send timed RemoteJoy controller input over USB", \
+			"Requires remotejoy.prx loaded on the PSP. Button names: cross circle square triangle, " \
+			"up down left right, ltrigger rtrigger start select. " \
+			"Combine buttons with + (e.g. cross+right). Durations are 1-10000 ms. " \
+			"Analog coordinates are 0-255 (128 is center).", \
+			"press buttons [ms] | analog x y [ms] | release") \
 	SHELL_CMD("scrshot", "ss", scrshot_cmd, 1, "Take a screen shot", "", "file [pri]") \
 	SHELL_CMD("calc", NULL, calc_cmd, 1, "Do a simple address calculation", "", "addr [d|o|x]") \
 	SHELL_CMD("reset", "r", reset_cmd, 0, "Reset", "", "[key]") \
